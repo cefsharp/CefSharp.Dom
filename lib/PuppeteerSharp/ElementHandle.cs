@@ -207,6 +207,19 @@ namespace CefSharp.Puppeteer
             var (x, y) = await ClickablePointAsync().ConfigureAwait(false);
             await DevToolsContext.Mouse.ClickAsync(x, y, options).ConfigureAwait(false);
         }
+        
+        /// <summary>
+        /// Scrolls element into view if needed, and then uses <see cref="DevToolsContext.Mouse"/> to click a random position of the element.
+        /// </summary>
+        /// <param name="options">click options</param>
+        /// <exception cref="PuppeteerException">if the element is detached from DOM</exception>
+        /// <returns>Task which resolves when the element is successfully clicked</returns>
+        public async Task ClickRandomAsync(ClickOptions options = null)
+        {
+            await ScrollIntoViewIfNeededAsync().ConfigureAwait(false);
+            var (x, y) = await ClickableRandomPointAsync().ConfigureAwait(false);
+            await DevToolsContext.Mouse.ClickAsync(x, y, options).ConfigureAwait(false);
+        }
 
         /// <summary>
         /// Uploads files
@@ -668,6 +681,60 @@ namespace CefSharp.Puppeteer
             var (x, y) = await ClickablePointAsync().ConfigureAwait(false);
             var targetPoint = await target.ClickablePointAsync().ConfigureAwait(false);
             await DevToolsContext.Mouse.DragAndDropAsync(x, y, targetPoint.x, targetPoint.y, delay).ConfigureAwait(false);
+        }
+        
+                private async Task<(decimal x, decimal y)> ClickableRandomPointAsync()
+        {
+            GetContentQuadsResponse result = null;
+
+            var contentQuadsTask = Client.SendAsync<GetContentQuadsResponse>("DOM.getContentQuads", new DomGetContentQuadsRequest
+            {
+                ObjectId = RemoteObject.ObjectId
+            });
+            var layoutTask = Client.SendAsync<PageGetLayoutMetricsResponse>("Page.getLayoutMetrics");
+
+            try
+            {
+                await Task.WhenAll(contentQuadsTask, layoutTask).ConfigureAwait(false);
+                result = contentQuadsTask.Result;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unable to get content quads");
+            }
+
+            if (result == null || result.Quads.Length == 0)
+            {
+                throw new PuppeteerException("Node is either not visible or not an HTMLElement");
+            }
+
+            // Filter out quads that have too small area to click into.
+            var quads = result.Quads
+                .Select(FromProtocolQuad)
+                .Select(q => IntersectQuadWithViewport(q, layoutTask.Result))
+                .Where(q => ComputeQuadArea(q.ToArray()) > 1);
+
+            if (!quads.Any())
+            {
+                throw new PuppeteerException("Node is either not visible or not an HTMLElement");
+            }
+
+            // Return the middle point of the first quad.
+            var quad = quads.First();
+            var x = 0m;
+            var y = 0m;
+
+            foreach (var point in quad)
+            {
+                x += point.X;
+                y += point.Y;
+            }
+
+            random rnd = new random();
+
+            return (
+                x: rnd.Next(0,x),
+                y: rnd.Next(0,y));
         }
 
         private async Task<(decimal x, decimal y)> ClickablePointAsync()

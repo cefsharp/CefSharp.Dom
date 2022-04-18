@@ -729,7 +729,11 @@ namespace CefSharp.Puppeteer
                 Y = Math.Min(Math.Max(point.Y, 0), viewport.ContentSize.Height),
             });
 
-        private async Task ScrollIntoViewIfNeededAsync()
+        /// <summary>
+        /// Scrolls to a position from the browser
+        /// </summary>
+        /// <returns>A Task that resolves when the message was confirmed by the browser</returns>
+        public async Task ScrollIntoViewIfNeededAsync()
         {
             var errorMessage = await EvaluateFunctionAsync<string>(
                 @"async(element, pageJavascriptEnabled) => {

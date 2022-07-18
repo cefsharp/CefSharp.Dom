@@ -10,7 +10,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\PuppeteerSharp\CefSharp.Puppeteer.csproj" />
+    <ProjectReference Include="..\PuppeteerSharp\CefSharp.DevTools.Dom.csproj" />
     <PackageReference Include="CefSharp.WinForms.NETCore" Version="102.0.90" />
   </ItemGroup>
 

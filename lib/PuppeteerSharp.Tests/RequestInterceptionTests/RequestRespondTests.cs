@@ -104,7 +104,7 @@ namespace PuppeteerSharp.Tests.RequestInterceptionTests
             await DevToolsContext.SetRequestInterceptionAsync(true);
             DevToolsContext.Request += async (_, e) =>
             {
-                var imageData = File.ReadAllBytes("./Assets/pptr.png");
+                var imageData = System.IO.File.ReadAllBytes("./Assets/pptr.png");
                 await e.Request.RespondAsync(new ResponseData
                 {
                     ContentType = "image/png",

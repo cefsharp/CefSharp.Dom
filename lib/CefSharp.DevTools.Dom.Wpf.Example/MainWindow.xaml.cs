@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.IO;
 using System.Windows;
 
 namespace CefSharp.DevTools.Dom.Wpf.Example
@@ -7,13 +6,13 @@ namespace CefSharp.DevTools.Dom.Wpf.Example
     /// <summary>
     /// Interaction logic for MainWindow.xaml
     /// </summary>
-    public partial class MainWindow : Window
+    public partial class MainWindow : System.Windows.Window
     {
         public MainWindow()
         {
             InitializeComponent();
 
-            Browser.RegisterResourceHandler("https://cefsharp.test/textarea.html", File.OpenRead("textarea.html"));
+            Browser.RegisterResourceHandler("https://cefsharp.test/textarea.html", System.IO.File.OpenRead("textarea.html"));
         }
 
         private async void ExecuteTestButtonClick(object sender, RoutedEventArgs e)

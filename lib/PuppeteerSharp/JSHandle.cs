@@ -254,6 +254,28 @@ namespace CefSharp.DevTools.Dom
             return ExecutionContext.EvaluateFunctionAsync<T>(script, list.ToArray());
         }
 
+        /// <summary>
+        /// Creates a Html Element from the <see cref="JSHandle"/>
+        /// </summary>
+        /// <typeparam name="T">Element type</typeparam>
+        /// <returns>Element or null</returns>
+        public T ToDomHandle<T>()
+            where T : DomHandle
+        {
+            var remoteObject = RemoteObject;
+
+            // Types like FileList are of SubType other
+            if (remoteObject.Type == Messaging.RemoteObjectType.Object &&
+                (remoteObject.Subtype == Messaging.RemoteObjectSubtype.Node ||
+                remoteObject.Subtype == Messaging.RemoteObjectSubtype.Array ||
+                remoteObject.Subtype == Messaging.RemoteObjectSubtype.Other))
+            {
+                return HtmlObjectFactory.CreateObject<T>(remoteObject.ClassName, this);
+            }
+
+            return default;
+        }
+
         internal object FormatArgument(ExecutionContext context)
         {
             if (ExecutionContext.Id != context.Id)

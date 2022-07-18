@@ -1962,6 +1962,106 @@ namespace CefSharp.DevTools.Dom
             return devToolsContext;
         }
 
+        /// <summary>
+        /// Passes an expression to the <see cref="DevToolsContext.EvaluateExpressionHandleAsync(string)"/>, returns a <see cref="Task"/>, then <see cref="DevToolsContext.EvaluateExpressionHandleAsync(string)"/> would wait for the <see cref="Task"/> to resolve and return its value.
+        /// </summary>
+        /// <example>
+        /// <code>
+        /// <![CDATA[
+        /// var handle = await devToolsContext.EvaluateExpressionHandleAsync<HtmlElement>("button");
+        /// ]]>
+        /// </code>
+        /// </example>
+        /// <typeparam name="T">Type</typeparam>
+        /// <param name="script">Expression to be evaluated in the <seealso cref="ExecutionContext"/></param>
+        /// <returns>Resolves to the return value of <paramref name="script"/></returns>
+        public async Task<T> EvaluateExpressionHandleAsync<T>(string script)
+            where T : DomHandle
+        {
+            var handle = await EvaluateExpressionHandleAsync(script).ConfigureAwait(false);
+
+            return handle.ToDomHandle<T>();
+        }
+
+        /// <summary>
+        /// Creates the HTML element specified
+        /// </summary>
+        /// <typeparam name="T">HtmlElementType</typeparam>
+        /// <param name="tagName">
+        /// A string that specifies the type of element to be created.
+        /// The nodeName of the created element is initialized with the
+        /// value of tagName. Don't use qualified names (like "html:a")
+        /// with this method.
+        /// </param>
+        /// <returns>Created element</returns>
+        public async Task<T> CreateHtmlElementAsync<T>(string tagName)
+            where T : HtmlElement
+        {
+            var handle = await EvaluateFunctionHandleAsync(
+                @"(tagName) => {
+                    return document.createElement(tagName);
+                }",
+                tagName).ConfigureAwait(false);
+
+            return handle.ToDomHandle<T>();
+        }
+
+        /// <summary>
+        /// Creates the HTML element specified
+        /// </summary>
+        /// <typeparam name="T">HtmlElementType</typeparam>
+        /// <param name="tagName">
+        /// A string that specifies the type of element to be created.
+        /// The nodeName of the created element is initialized with the
+        /// value of tagName. Don't use qualified names (like "html:a")
+        /// with this method.
+        /// </param>
+        /// <param name="id">element id</param>
+        /// <returns>Created element</returns>
+        public async Task<T> CreateHtmlElementAsync<T>(string tagName, string id)
+            where T : HtmlElement
+        {
+            var handle = await EvaluateFunctionHandleAsync(
+                @"(tagName, id) => {
+                    let e = document.createElement(tagName);
+                    e.id = id;
+                    return e;
+                }",
+                tagName,
+                id).ConfigureAwait(false);
+
+            return handle.ToDomHandle<T>();
+        }
+
+        /// <summary>
+        /// The method runs <c>document.querySelector</c> within the page. If no element matches the selector, the return value resolve to <c>null</c>.
+        /// </summary>
+        /// <typeparam name="T">Type of <see cref="HtmlElement"/> or derived type</typeparam>
+        /// <param name="querySelector">A selector to query page for</param>
+        /// <returns>Task which resolves to <see cref="HtmlElement"/> pointing to the frame element</returns>
+        /// <remarks>
+        /// Shortcut for <c>page.MainFrame.QuerySelectorAsync(selector)</c>
+        /// </remarks>
+        /// <seealso cref="Frame.QuerySelectorAsync(string)"/>
+        public Task<T> QuerySelectorAsync<T>(string querySelector)
+            where T : Element
+        {
+            return MainFrame.QuerySelectorAsync<T>(querySelector);
+        }
+
+        /// <summary>
+        /// Runs <c>document.querySelectorAll</c> within the page. If no elements match the selector, the return value resolve to <see cref="Array.Empty{T}"/>.
+        /// </summary>
+        /// <typeparam name="T">Type derived from <see cref="Element"/></typeparam>
+        /// <param name="querySelector">A selector to query page for</param>
+        /// <returns>Task which resolves to ElementHandles pointing to the frame elements</returns>
+        /// <seealso cref="Frame.QuerySelectorAllAsync(string)"/>
+        public Task<T[]> QuerySelectorAllAsync<T>(string querySelector)
+            where T : Element
+        {
+            return MainFrame.QuerySelectorAllAsync<T>(querySelector);
+        }
+
         internal void WireUpEvents()
         {
             FrameManager = new FrameManager(Connection, this, _timeoutSettings);

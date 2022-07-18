@@ -278,7 +278,7 @@ namespace CefSharp.DevTools.Dom
             {
                 try
                 {
-                    File.Open(file, FileMode.Open).Dispose();
+                    System.IO.File.Open(file, FileMode.Open).Dispose();
                 }
                 catch (Exception ex)
                 {

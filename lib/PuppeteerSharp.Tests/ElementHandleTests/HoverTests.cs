@@ -19,7 +19,7 @@ namespace PuppeteerSharp.Tests.ElementHandleTests
         public async Task ShouldWork()
         {
             await DevToolsContext.GoToAsync(TestConstants.ServerUrl + "/input/scrollable.html");
-            var button = await DevToolsContext.QuerySelectorAsync("#button-6");
+            var button = await DevToolsContext.QuerySelectorAsync<HtmlButtonElement>("#button-6");
             await button.HoverAsync();
             Assert.Equal("button-6", await DevToolsContext.EvaluateExpressionAsync<string>(
                 "document.querySelector('button:hover').id"));

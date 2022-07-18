@@ -133,12 +133,12 @@ namespace PuppeteerSharp.Tests.ScreenshotTests
         //{
         //    await using (var page = await Context.NewPageAsync())
         //    {
-        //        await Page.SetViewportAsync(new ViewPortOptions
+        //        await DevToolsContext.SetViewportAsync(new ViewPortOptions
         //        {
         //            Width = 500,
         //            Height = 500
         //        });
-        //        await Page.GoToAsync(TestConstants.ServerUrl + "/grid.html");
+        //        await DevToolsContext.GoToAsync(TestConstants.ServerUrl + "/grid.html");
 
         //        var tasks = new List<Task<byte[]>>();
         //        for (var i = 0; i < 3; ++i)
@@ -188,7 +188,7 @@ namespace PuppeteerSharp.Tests.ScreenshotTests
         //        async Task<Page> func()
         //        {
         //            var page = await Context.NewPageAsync();
-        //            await page.GoToAsync(TestConstants.ServerUrl + "/grid.html");
+        //            await DevToolsContext.GoToAsync(TestConstants.ServerUrl + "/grid.html");
         //            return page;
         //        }
 

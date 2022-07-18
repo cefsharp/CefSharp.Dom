@@ -20,7 +20,7 @@ namespace PuppeteerSharp.Tests.ElementHandleTests
         {
             await DevToolsContext.GoToAsync(TestConstants.EmptyPage);
             await FrameUtils.AttachFrameAsync(DevToolsContext, "frame1", TestConstants.EmptyPage);
-            var elementHandle = await DevToolsContext.QuerySelectorAsync("#frame1");
+            var elementHandle = await DevToolsContext.QuerySelectorAsync<HtmlInlineFrameElement>("#frame1");
             var frame = await elementHandle.ContentFrameAsync();
             Assert.Equal(DevToolsContext.FirstChildFrame(), frame);
         }

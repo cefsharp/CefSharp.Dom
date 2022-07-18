@@ -122,7 +122,7 @@ namespace CefSharp.DevTools.Dom
         /// <returns>Task which resolves to a <see cref="Dictionary{TKey, TValue}"/></returns>
         /// <example>
         /// <code>
-        /// var handle = await page.EvaluateExpressionHandle("({window, document})");
+        /// var handle = await devToolsContext.EvaluateExpressionHandle("({window, document})");
         /// var properties = await handle.GetPropertiesAsync();
         /// var windowHandle = properties["window"];
         /// var documentHandle = properties["document"];

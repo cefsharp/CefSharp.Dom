@@ -54,12 +54,12 @@ namespace CefSharp.DevTools.Dom
         ///     FullPage = true,
         ///     BurstMode = true
         /// };
-        /// await page.GoToAsync("https://www.google.com");
+        /// await devToolsContext.GoToAsync("https://www.google.com");
         /// for(var x = 0; x < 100; x++)
         /// {
-        ///     await page.ScreenshotBase64Async(screenShotOptions);
+        ///     await devToolsContext.ScreenshotBase64Async(screenShotOptions);
         /// }
-        /// await page.SetBurstModeOffAsync();
+        /// await devToolsContext.SetBurstModeOffAsync();
         /// ]]></example>
         [JsonIgnore]
         public bool BurstMode { get; set; } = false;

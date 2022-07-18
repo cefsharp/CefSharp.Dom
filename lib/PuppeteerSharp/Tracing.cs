@@ -12,13 +12,13 @@ namespace CefSharp.DevTools.Dom
     /// </summary>
     /// <example>
     /// <code>
-    /// await Page.Tracing.StartAsync(new TracingOptions
+    /// await devToolsContext.Tracing.StartAsync(new TracingOptions
     /// {
     ///     Screenshots = true,
     ///     Path = _file
     /// });
-    /// await Page.GoToAsync(TestConstants.ServerUrl + "/grid.html");
-    /// await Page.Tracing.StopAsync();
+    /// await devToolsContext.GoToAsync(TestConstants.ServerUrl + "/grid.html");
+    /// await devToolsContext.Tracing.StopAsync();
     /// </code>
     /// </example>
 #pragma warning disable CA1724

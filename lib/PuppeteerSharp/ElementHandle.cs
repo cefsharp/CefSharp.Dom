@@ -354,7 +354,7 @@ namespace CefSharp.DevTools.Dom
         /// </code>
         /// An example of typing into a text field and then submitting the form:
         /// <code>
-        /// var elementHandle = await page.GetElementAsync("input");
+        /// var elementHandle = await devToolsContext.GetElementAsync("input");
         /// await elementHandle.TypeAsync("some text");
         /// await elementHandle.PressAsync("Enter");
         /// </code>

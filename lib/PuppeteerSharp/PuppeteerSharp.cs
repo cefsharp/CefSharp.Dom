@@ -1,4 +1,4 @@
-namespace CefSharp.Puppeteer
+namespace CefSharp.DevTools.Dom
 {
     /// <summary>
     /// Provides a method to launch a Chromium instance.

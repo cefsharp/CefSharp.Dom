@@ -2,7 +2,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Windows;
 
-namespace CefSharp.Puppeteer.Wpf.Example
+namespace CefSharp.DevTools.Dom.Wpf.Example
 {
     /// <summary>
     /// Interaction logic for MainWindow.xaml

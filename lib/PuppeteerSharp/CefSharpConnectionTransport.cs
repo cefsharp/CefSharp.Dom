@@ -2,10 +2,10 @@ using System;
 using System.IO;
 using System.Threading.Tasks;
 using CefSharp.Callback;
+using CefSharp.DevTools.Dom.Transport;
 using CefSharp.Internals;
-using CefSharp.Puppeteer.Transport;
 
-namespace CefSharp.Puppeteer
+namespace CefSharp.DevTools.Dom
 {
     internal class CefSharpConnectionTransport : IConnectionTransport
     {

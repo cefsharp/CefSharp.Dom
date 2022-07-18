@@ -3,7 +3,7 @@ using System.ComponentModel;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
-namespace CefSharp.Puppeteer
+namespace CefSharp.DevTools.Dom
 {
     /// <summary>
     /// WebBrowserExtensions
@@ -54,7 +54,9 @@ namespace CefSharp.Puppeteer
                 CefSharp.WebBrowserExtensions.ThrowExceptionIfBrowserHostNull(browserHost);
             }
 
+#pragma warning disable CA2000 // Dispose objects before losing scope
             var connection = DevToolsConnection.Attach(new CefSharpConnectionTransport(browserHost), factory);
+#pragma warning restore CA2000 // Dispose objects before losing scope
 
             ctx = await DevToolsContext.CreateDevToolsContextAsync(connection, ignoreHTTPSerrors: ignoreHTTPSerrors).ConfigureAwait(false);
 

@@ -7,7 +7,7 @@ using System;
 using System.IO;
 using System.Windows.Forms;
 
-namespace CefSharp.Puppeteer.WinForms.Example
+namespace CefSharp.DevTools.Dom.WinForms.Example
 {
     public static class Program
     {

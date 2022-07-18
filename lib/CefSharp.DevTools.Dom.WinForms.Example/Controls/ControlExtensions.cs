@@ -5,7 +5,7 @@
 using System;
 using System.Windows.Forms;
 
-namespace CefSharp.Puppeteer.WinForms.Example.Controls
+namespace CefSharp.DevTools.Dom.WinForms.Example.Controls
 {
     public static class ControlExtensions
     {

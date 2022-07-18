@@ -9,19 +9,19 @@ using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using System.Timers;
-using CefSharp.Puppeteer.Helpers;
-using CefSharp.Puppeteer.Helpers.Json;
-using CefSharp.Puppeteer.Input;
-using CefSharp.Puppeteer.Media;
-using CefSharp.Puppeteer.Messaging;
-using CefSharp.Puppeteer.Mobile;
-using CefSharp.Puppeteer.PageAccessibility;
-using CefSharp.Puppeteer.PageCoverage;
+using CefSharp.DevTools.Dom.Helpers;
+using CefSharp.DevTools.Dom.Helpers.Json;
+using CefSharp.DevTools.Dom.Input;
+using CefSharp.DevTools.Dom.Media;
+using CefSharp.DevTools.Dom.Messaging;
+using CefSharp.DevTools.Dom.Mobile;
+using CefSharp.DevTools.Dom.PageAccessibility;
+using CefSharp.DevTools.Dom.PageCoverage;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
-namespace CefSharp.Puppeteer
+namespace CefSharp.DevTools.Dom
 {
     /// <summary>
     /// Provides methods to interact with a ChromiumWebBrowser instance
@@ -69,7 +69,7 @@ namespace CefSharp.Puppeteer
             _emulationManager = new EmulationManager(client);
             _pageBindings = new Dictionary<string, Delegate>();
             _logger = Connection.LoggerFactory.CreateLogger<DevToolsContext>();
-            Accessibility = new Accessibility(client);
+            Accessibility = new PageAccessibility.Accessibility(client);
         }
 
         /// <inheritdoc/>
@@ -301,7 +301,7 @@ namespace CefSharp.Puppeteer
         /// <summary>
         /// Gets the accessibility.
         /// </summary>
-        public Accessibility Accessibility { get; }
+        public PageAccessibility.Accessibility Accessibility { get; }
 
         /// <summary>
         /// `true` if drag events are being intercepted, `false` otherwise.

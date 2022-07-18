@@ -2,15 +2,15 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
-using CefSharp.Puppeteer.Input;
-using CefSharp.Puppeteer.Media;
-using CefSharp.Puppeteer.Messaging;
-using CefSharp.Puppeteer.Mobile;
-using CefSharp.Puppeteer.PageAccessibility;
-using CefSharp.Puppeteer.PageCoverage;
+using CefSharp.DevTools.Dom.Input;
+using CefSharp.DevTools.Dom.Media;
+using CefSharp.DevTools.Dom.Messaging;
+using CefSharp.DevTools.Dom.Mobile;
+using CefSharp.DevTools.Dom.PageAccessibility;
+using CefSharp.DevTools.Dom.PageCoverage;
 using Newtonsoft.Json.Linq;
 
-namespace CefSharp.Puppeteer
+namespace CefSharp.DevTools.Dom
 {
     /// <summary>
     /// Provides an entry point for DevTools protocol
@@ -143,7 +143,7 @@ namespace CefSharp.Puppeteer
         /// <summary>
         /// Gets the accessibility.
         /// </summary>
-        Accessibility Accessibility { get; }
+        PageAccessibility.Accessibility Accessibility { get; }
 
         /// <summary>
         /// Chrome DevTools Protocol connection

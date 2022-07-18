@@ -4,7 +4,7 @@ using Xunit.Abstractions;
 using PuppeteerSharp.Xunit;
 using PuppeteerSharp.Tests.Attributes;
 using CefSharp;
-using CefSharp.Puppeteer;
+using CefSharp.DevTools.Dom;
 
 namespace PuppeteerSharp.Tests.QuerySelectorTests
 {

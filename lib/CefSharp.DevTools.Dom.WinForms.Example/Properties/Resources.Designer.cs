@@ -8,7 +8,7 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-namespace CefSharp.Puppeteer.WinForms.Example.Properties {
+namespace CefSharp.DevTools.Dom.WinForms.Example.Properties {
     /// <summary>
     ///   A strongly-typed resource class, for looking up localized strings, etc.
     /// </summary>

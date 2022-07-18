@@ -3,7 +3,7 @@ using System.IO;
 using System.Windows;
 using CefSharp.Wpf;
 
-namespace CefSharp.Puppeteer.Wpf.Example
+namespace CefSharp.DevTools.Dom.Wpf.Example
 {
     /// <summary>
     /// Interaction logic for App.xaml

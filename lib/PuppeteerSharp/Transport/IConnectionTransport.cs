@@ -1,7 +1,7 @@
 using System;
 using System.Threading.Tasks;
 
-namespace CefSharp.Puppeteer.Transport
+namespace CefSharp.DevTools.Dom.Transport
 {
     /// <summary>
     /// Connection transport abstraction.

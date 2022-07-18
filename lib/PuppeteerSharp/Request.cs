@@ -6,10 +6,10 @@ using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
-using CefSharp.Puppeteer.Messaging;
+using CefSharp.DevTools.Dom.Messaging;
 using Microsoft.Extensions.Logging;
 
-namespace CefSharp.Puppeteer
+namespace CefSharp.DevTools.Dom
 {
     /// <summary>
     /// Whenever the page sends a request, the following events are emitted by puppeteer's page:

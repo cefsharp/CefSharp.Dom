@@ -11,10 +11,8 @@ namespace CefSharp.DevTools.Dom
             TaskWrapper = new TaskCompletionSource<JObject>(TaskCreationOptions.RunContinuationsAsynchronously);
         }
 
-        #region public Properties
         internal TaskCompletionSource<JObject> TaskWrapper { get; }
 
         internal string Method { get; }
-        #endregion
     }
 }

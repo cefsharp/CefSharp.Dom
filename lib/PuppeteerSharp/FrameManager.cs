@@ -36,8 +36,6 @@ namespace CefSharp.DevTools.Dom
             Connection.MessageReceived += OnConnectionMessageReceived;
         }
 
-        #region Properties
-
         internal event EventHandler<FrameEventArgs> FrameAttached;
 
         internal event EventHandler<FrameEventArgs> FrameDetached;
@@ -57,9 +55,7 @@ namespace CefSharp.DevTools.Dom
         internal IDevToolsContext DevToolsContext { get; }
 
         internal TimeoutSettings TimeoutSettings { get; }
-        #endregion
 
-        #region Public Methods
         internal ExecutionContext ExecutionContextById(int contextId)
         {
             _contextIdToContext.TryGetValue(contextId, out var context);
@@ -136,10 +132,6 @@ namespace CefSharp.DevTools.Dom
                 return watcher.NavigationResponse;
             }
         }
-
-        #endregion
-
-        #region Private Methods
 
         private async void OnConnectionMessageReceived(object sender, MessageEventArgs e)
         {
@@ -411,7 +403,5 @@ namespace CefSharp.DevTools.Dom
         internal Task<Frame> GetFrameAsync(string frameId) => _asyncFrames.GetItemAsync(frameId);
 
         internal Task<Frame> TryGetFrameAsync(string frameId) => _asyncFrames.TryGetItemAsync(frameId);
-
-        #endregion
     }
 }

@@ -32,12 +32,8 @@ namespace CefSharp.DevTools.Dom
             MessageQueue = new AsyncMessageQueue(enqueueAsyncMessages, _logger);
         }
 
-        #region Private Members
         private readonly ConcurrentDictionary<int, MessageTask> _callbacks;
         private int _lastId;
-        #endregion
-
-        #region Properties
 
         /// <summary>
         /// Gets the Connection transport.
@@ -73,10 +69,6 @@ namespace CefSharp.DevTools.Dom
         public ILoggerFactory LoggerFactory { get; }
 
         internal AsyncMessageQueue MessageQueue { get; }
-
-        #endregion
-
-        #region Public Methods
 
         internal int GetMessageID() => Interlocked.Increment(ref _lastId);
 
@@ -118,7 +110,6 @@ namespace CefSharp.DevTools.Dom
         /// </summary>
         /// <returns>returns true if there are pending callbacks, otherwise false</returns>
         public bool HasPendingCallbacks() => _callbacks.Count != 0;
-        #endregion
 
         internal void Close(string closeReason)
         {
@@ -143,8 +134,6 @@ namespace CefSharp.DevTools.Dom
             _callbacks.Clear();
             MessageQueue.Dispose();
         }
-
-        #region Private Methods
 
         private void OnTransportMessageReceived(object sender, MessageReceivedEventArgs e)
         {
@@ -204,10 +193,6 @@ namespace CefSharp.DevTools.Dom
             }
         }
 
-        #endregion
-
-        #region Static Methods
-
         /// <summary>
         /// Attach to an existing embedded Browser instance
         /// </summary>
@@ -249,9 +234,6 @@ namespace CefSharp.DevTools.Dom
             Transport.MessageReceived -= OnTransportMessageReceived;
             Transport.Dispose();
         }
-        #endregion
-
-        #region Public Methods
 
         internal void Send(string method, object args = null)
             => _ = SendAsync(method, args, false);
@@ -290,7 +272,5 @@ namespace CefSharp.DevTools.Dom
 
             return waitForCallback ? await callback.TaskWrapper.Task.ConfigureAwait(false) : null;
         }
-
-        #endregion
     }
 }

@@ -76,7 +76,6 @@ namespace CefSharp.DevTools.Dom
             }
         }
 
-        #region Properties
         /// <summary>
         /// Gets the child frames of the this frame
         /// </summary>
@@ -113,9 +112,6 @@ namespace CefSharp.DevTools.Dom
         public Frame ParentFrame { get; private set; }
 
         internal FrameManager FrameManager { get; }
-        #endregion
-
-        #region Public Methods
 
         /// <summary>
         /// Navigates to an url
@@ -614,7 +610,5 @@ namespace CefSharp.DevTools.Dom
             }
             ParentFrame = null;
         }
-
-        #endregion
     }
 }

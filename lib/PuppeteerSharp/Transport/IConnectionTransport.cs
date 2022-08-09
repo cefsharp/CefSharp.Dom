@@ -26,5 +26,9 @@ namespace CefSharp.DevTools.Dom.Transport
         /// Occurs when a message is received.
         /// </summary>
         event EventHandler<MessageReceivedEventArgs> MessageReceived;
+        /// <summary>
+        /// Occurs when an error occurs processing the message.
+        /// </summary>
+        event EventHandler<MessageErrorEventArgs> MessageError;
     }
 }

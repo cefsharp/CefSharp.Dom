@@ -17,6 +17,8 @@ namespace CefSharp.DevTools.Dom
 
         public event EventHandler<MessageReceivedEventArgs> MessageReceived;
 
+        public event EventHandler<MessageErrorEventArgs> MessageError;
+
         public CefSharpConnectionTransport(IBrowserHost browserHost)
         {
             _browserHost = browserHost;
@@ -33,7 +35,7 @@ namespace CefSharp.DevTools.Dom
                 }
                 catch (Exception ex)
                 {
-                    MessageReceived?.Invoke(this, new MessageReceivedEventArgs(ex));
+                    MessageError?.Invoke(this, new MessageErrorEventArgs(ex));
                 }
             });
 

@@ -7,7 +7,7 @@
 		<IsTestProject>true</IsTestProject>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
-    <AssemblyName>PuppeteerSharp.Tests</AssemblyName>
+    <AssemblyName>CefSharp.DevTools.Dom.Tests</AssemblyName>
 	</PropertyGroup>
 	<ItemGroup>
 	  <Compile Remove="AccessibilityTests\**" />

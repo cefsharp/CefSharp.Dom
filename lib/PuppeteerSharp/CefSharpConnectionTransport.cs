@@ -25,9 +25,16 @@ namespace CefSharp.DevTools.Dom
             observer.OnDevToolsAgentDetached((b) => { IsClosed = true; });
             observer.OnDevToolsMessage((b, m) =>
             {
-                using var reader = new StreamReader(m);
-                var msg = reader.ReadToEnd();
-                MessageReceived?.Invoke(this, new MessageReceivedEventArgs(msg));
+                try
+                {
+                    using var reader = new StreamReader(m);
+                    var msg = reader.ReadToEnd();
+                    MessageReceived?.Invoke(this, new MessageReceivedEventArgs(msg));
+                }
+                catch (Exception ex)
+                {
+                    MessageReceived?.Invoke(this, new MessageReceivedEventArgs(ex));
+                }
             });
 
             _devtoolsMessageObserver = observer;

@@ -2,7 +2,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
     <TargetFramework>netcoreapp3.1</TargetFramework>
-    <RuntimeIdentifier>$(NETCoreSdkRuntimeIdentifier)</RuntimeIdentifier>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <SelfContained Condition="'$(SelfContained)' == ''">false</SelfContained>
 		<IsTestProject>true</IsTestProject>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>

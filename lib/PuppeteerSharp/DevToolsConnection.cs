@@ -27,7 +27,7 @@ namespace CefSharp.DevTools.Dom
 
             _logger = LoggerFactory.CreateLogger<DevToolsConnection>();
 
-            Transport.MessageReceived += Transport_MessageReceived;
+            Transport.MessageReceived += OnTransportMessageReceived;
             _callbacks = new ConcurrentDictionary<int, MessageTask>();
             MessageQueue = new AsyncMessageQueue(enqueueAsyncMessages, _logger);
         }
@@ -146,10 +146,19 @@ namespace CefSharp.DevTools.Dom
 
         #region Private Methods
 
-        private void Transport_MessageReceived(object sender, MessageReceivedEventArgs e)
+        private void OnTransportMessageReceived(object sender, MessageReceivedEventArgs e)
         {
             try
             {
+                if (e.HasException)
+                {
+                    var message = $"Connection failed to process {e.Exception.Message}. {e.Exception.Message}. {e.Exception.StackTrace}";
+                    _logger.LogError(e.Exception, message);
+                    Close(message);
+
+                    return;
+                }
+
                 var response = e.Message;
                 ConnectionResponse obj = null;
 
@@ -237,7 +246,7 @@ namespace CefSharp.DevTools.Dom
         protected virtual void Dispose(bool disposing)
         {
             Close("Connection disposed");
-            Transport.MessageReceived -= Transport_MessageReceived;
+            Transport.MessageReceived -= OnTransportMessageReceived;
             Transport.Dispose();
         }
         #endregion

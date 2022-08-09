@@ -29,12 +29,12 @@
   <Import Project="../Common/SignAssembly.props" />
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net472'">
-    <PackageReference Include="CefSharp.Common" Version="103.0.120" />
+    <PackageReference Include="CefSharp.Common" Version="102.0.100" />
     <Reference Include="System.Net.Http" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' != 'net472'">
-    <PackageReference Include="CefSharp.Common.NETCore" Version="103.0.120" />
+    <PackageReference Include="CefSharp.Common.NETCore" Version="102.0.100" />
   </ItemGroup>
   
   <ItemGroup>

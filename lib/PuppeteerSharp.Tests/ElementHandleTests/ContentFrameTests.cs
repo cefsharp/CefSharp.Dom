@@ -1,5 +1,6 @@
 using System.Linq;
 using System.Threading.Tasks;
+using CefSharp.DevTools.Dom;
 using PuppeteerSharp.Tests.Attributes;
 using PuppeteerSharp.Xunit;
 using Xunit;

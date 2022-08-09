@@ -1,4 +1,5 @@
 using System.Threading.Tasks;
+using CefSharp.DevTools.Dom;
 using PuppeteerSharp.Tests.Attributes;
 using Xunit;
 using Xunit.Abstractions;

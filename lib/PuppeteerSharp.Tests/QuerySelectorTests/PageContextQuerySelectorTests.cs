@@ -2,6 +2,8 @@ using System.Threading.Tasks;
 using Xunit;
 using Xunit.Abstractions;
 using PuppeteerSharp.Tests.Attributes;
+using CefSharp.DevTools.Dom;
+using CefSharp;
 
 namespace PuppeteerSharp.Tests.QuerySelectorTests
 {
@@ -13,34 +15,32 @@ namespace PuppeteerSharp.Tests.QuerySelectorTests
         }
 
 #pragma warning disable xUnit1013 // Public method should be marked as test
-        public static async Task Usage()
+        public static async Task Usage(IWebBrowser chromiumWebBrowser)
 #pragma warning restore xUnit1013 // Public method should be marked as test
         {
             #region QuerySelector
 
-            using var browserFetcher = new BrowserFetcher();
-            await browserFetcher.DownloadAsync();
-            await using var browser = await Puppeteer.LaunchAsync(new LaunchOptions { Headless = true });
-            await using var page = await browser.NewPageAsync();
-            await DevToolsContext.GoToAsync("http://www.google.com"); // In case of fonts being loaded from a CDN, use WaitUntilNavigation.Networkidle0 as a second param.
+            // Add using CefSharp.DevTools.Dom to access CreateDevToolsContextAsync and related extension methods.
+            await using var devToolsContext = await chromiumWebBrowser.CreateDevToolsContextAsync();
 
-            // Add using PuppeteerSharp.Dom to access QuerySelectorAsync<T> and QuerySelectorAllAsync<T> extension methods.
+            await devToolsContext.GoToAsync("http://www.google.com");
+
             // Get element by Id
             // https://developer.mozilla.org/en-US/docs/Web/API/Document/querySelector
-            var element = await DevToolsContext.QuerySelectorAsync<HtmlElement>("#myElementId");
+            var element = await devToolsContext.QuerySelectorAsync<HtmlElement>("#myElementId");
 
             //Strongly typed element types (this is only a subset of the types mapped)
-            var htmlDivElement = await DevToolsContext.QuerySelectorAsync<HtmlDivElement>("#myDivElementId");
-            var htmlSpanElement = await DevToolsContext.QuerySelectorAsync<HtmlSpanElement>("#mySpanElementId");
-            var htmlSelectElement = await DevToolsContext.QuerySelectorAsync<HtmlSelectElement>("#mySelectElementId");
-            var htmlInputElement = await DevToolsContext.QuerySelectorAsync<HtmlInputElement>("#myInputElementId");
-            var htmlFormElement = await DevToolsContext.QuerySelectorAsync<HtmlFormElement>("#myFormElementId");
-            var htmlAnchorElement = await DevToolsContext.QuerySelectorAsync<HtmlAnchorElement>("#myAnchorElementId");
-            var htmlImageElement = await DevToolsContext.QuerySelectorAsync<HtmlImageElement>("#myImageElementId");
-            var htmlTextAreaElement = await DevToolsContext.QuerySelectorAsync<HtmlImageElement>("#myTextAreaElementId");
-            var htmlButtonElement = await DevToolsContext.QuerySelectorAsync<HtmlButtonElement>("#myButtonElementId");
-            var htmlParagraphElement = await DevToolsContext.QuerySelectorAsync<HtmlParagraphElement>("#myParagraphElementId");
-            var htmlTableElement = await DevToolsContext.QuerySelectorAsync<HtmlTableElement>("#myTableElementId");
+            var htmlDivElement = await devToolsContext.QuerySelectorAsync<HtmlDivElement>("#myDivElementId");
+            var htmlSpanElement = await devToolsContext.QuerySelectorAsync<HtmlSpanElement>("#mySpanElementId");
+            var htmlSelectElement = await devToolsContext.QuerySelectorAsync<HtmlSelectElement>("#mySelectElementId");
+            var htmlInputElement = await devToolsContext.QuerySelectorAsync<HtmlInputElement>("#myInputElementId");
+            var htmlFormElement = await devToolsContext.QuerySelectorAsync<HtmlFormElement>("#myFormElementId");
+            var htmlAnchorElement = await devToolsContext.QuerySelectorAsync<HtmlAnchorElement>("#myAnchorElementId");
+            var htmlImageElement = await devToolsContext.QuerySelectorAsync<HtmlImageElement>("#myImageElementId");
+            var htmlTextAreaElement = await devToolsContext.QuerySelectorAsync<HtmlImageElement>("#myTextAreaElementId");
+            var htmlButtonElement = await devToolsContext.QuerySelectorAsync<HtmlButtonElement>("#myButtonElementId");
+            var htmlParagraphElement = await devToolsContext.QuerySelectorAsync<HtmlParagraphElement>("#myParagraphElementId");
+            var htmlTableElement = await devToolsContext.QuerySelectorAsync<HtmlTableElement>("#myTableElementId");
 
             // Get a custom attribute value
             var customAttribute = await element.GetAttributeAsync<string>("data-customAttribute");
@@ -64,24 +64,24 @@ namespace PuppeteerSharp.Tests.QuerySelectorTests
             await element.ClickAsync();
 
             // Simple way of chaining method calls together when you don't need a handle to the HtmlElement
-            var htmlButtonElementInnerText = await DevToolsContext.QuerySelectorAsync<HtmlButtonElement>("#myButtonElementId")
+            var htmlButtonElementInnerText = await devToolsContext.QuerySelectorAsync<HtmlButtonElement>("#myButtonElementId")
                 .AndThen(x => x.GetInnerTextAsync());
 
             //Event Handler
             //Expose a function to javascript, functions persist across navigations
             //So only need to do this once
-            await DevToolsContext.ExposeFunctionAsync("jsAlertButtonClick", () =>
+            await devToolsContext.ExposeFunctionAsync("jsAlertButtonClick", () =>
             {
-                _ = page.EvaluateExpressionAsync("window.alert('Hello! You invoked window.alert()');");
+                _ = devToolsContext.EvaluateExpressionAsync("window.alert('Hello! You invoked window.alert()');");
             });
 
-            var jsAlertButton = await DevToolsContext.QuerySelectorAsync<HtmlButtonElement>("#jsAlertButton");
+            var jsAlertButton = await devToolsContext.QuerySelectorAsync<HtmlButtonElement>("#jsAlertButton");
 
             //Write up the click event listner to call our exposed function
             _ = jsAlertButton.AddEventListenerAsync("click", "jsAlertButtonClick");
 
             //Get a collection of HtmlElements
-            var divElements = await DevToolsContext.QuerySelectorAllAsync<HtmlDivElement>("div");
+            var divElements = await devToolsContext.QuerySelectorAllAsync<HtmlDivElement>("div");
 
             foreach (var div in divElements)
             {
@@ -103,7 +103,7 @@ namespace PuppeteerSharp.Tests.QuerySelectorTests
                 var cells = await row.GetCellsAsync().ToArrayAsync();
                 foreach (var cell in cells)
                 {
-                    var newDiv = await DevToolsContext.CreateHtmlElementAsync<HtmlDivElement>("div");
+                    var newDiv = await devToolsContext.CreateHtmlElementAsync<HtmlDivElement>("div");
                     await newDiv.SetInnerTextAsync("New Div Added!");
                     await cell.AppendChildAsync(newDiv);
                 }
@@ -118,7 +118,7 @@ namespace PuppeteerSharp.Tests.QuerySelectorTests
                 var cells = await row.GetCellsAsync();
                 await foreach (var cell in cells)
                 {
-                    var newDiv = await DevToolsContext.CreateHtmlElementAsync<HtmlDivElement>("div");
+                    var newDiv = await devToolsContext.CreateHtmlElementAsync<HtmlDivElement>("div");
                     await newDiv.SetInnerTextAsync("New Div Added!");
                     await cell.AppendChildAsync(newDiv);
                 }

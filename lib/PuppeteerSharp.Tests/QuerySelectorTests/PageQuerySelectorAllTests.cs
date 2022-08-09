@@ -4,6 +4,7 @@ using Xunit;
 using Xunit.Abstractions;
 using PuppeteerSharp.Tests.Attributes;
 using CefSharp.DevTools.Dom;
+using CefSharp;
 
 namespace PuppeteerSharp.Tests.QuerySelectorTests
 {
@@ -15,14 +16,14 @@ namespace PuppeteerSharp.Tests.QuerySelectorTests
         }
 
 #pragma warning disable xUnit1013 // Public method should be marked as test
-        public static async Task Usage(DevToolsContext devToolsContext)
+        public static async Task Usage(IWebBrowser chromiumWebBrowser)
 #pragma warning restore xUnit1013 // Public method should be marked as test
         {
             #region QuerySelectorAll
 
-            await devToolsContext.GoToAsync("http://www.google.com"); // In case of fonts being loaded from a CDN, use WaitUntilNavigation.Networkidle0 as a second param.
+            // Add using CefSharp.DevTools.Dom to access CreateDevToolsContextAsync and related extension methods.
+            await using var devToolsContext = await chromiumWebBrowser.CreateDevToolsContextAsync();
 
-            // Add using PuppeteerSharp.Dom to access QuerySelectorAllAsync<T> extension method
             // Get elements by tag name
             // https://developer.mozilla.org/en-US/docs/Web/API/Document/querySelectorAll
             var inputElements = await devToolsContext.QuerySelectorAllAsync<HtmlInputElement>("input");

@@ -2,6 +2,7 @@ using System.Threading.Tasks;
 using PuppeteerSharp.Tests.Attributes;
 using Xunit.Abstractions;
 using Xunit;
+using CefSharp.DevTools.Dom;
 
 namespace PuppeteerSharp.Tests.ElementHandleTests
 {

@@ -30,6 +30,23 @@ namespace PuppeteerSharp.Tests.WaitForTests
             Assert.True(found);
         }
 
+        [PuppeteerTest("waittask.spec.ts", "Page.waitFor", "should wait for selectors with delay")]
+        [PuppeteerFact]
+        public async Task ShouldWaitForSelectorsWithDelay()
+        {
+            var found = false;
+            var waitFor = DevToolsContext.WaitForSelectorAsync("div").ContinueWith(_ => found = true);
+            await DevToolsContext.GoToAsync(TestConstants.EmptyPage);
+
+            Assert.False(found);
+
+            await DevToolsContext.GoToAsync(TestConstants.ServerUrl + "/grid.html");
+            await waitFor;
+            await Task.Delay(1000);
+            await waitFor;
+            Assert.True(found);
+        }
+
         [PuppeteerTest("waittask.spec.ts", "Page.waitFor", "should wait for an xpath")]
         [PuppeteerFact]
         public async Task ShouldWaitForAnXpath()

@@ -28,7 +28,7 @@ namespace PuppeteerSharp.Tests.CoverageTests
             await DevToolsContext.GoToAsync(TestConstants.ServerUrl + "/jscoverage/multiple.html");
             await DevToolsContext.GoToAsync(TestConstants.EmptyPage);
             var coverage = await DevToolsContext.Coverage.StopJSCoverageAsync();
-            Assert.Equal(2, coverage.Length);
+            Assert.Equal(3, coverage.Length);
         }
 
         [PuppeteerTest("coverage.spec.ts", "resetOnNavigation", "should NOT report scripts across navigations when enabled")]

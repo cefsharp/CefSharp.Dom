@@ -41,10 +41,7 @@ namespace PuppeteerSharp.Tests.JSHandleTests
         [PuppeteerFact]
         public async Task ShouldWorkForIFrames()
         {
-            await DevToolsContext.EvaluateExpressionAsync(@"document.body.style.padding = '10px';
-                document.body.style.margin = '10px';
-                document.body.innerHTML = `<iframe style=""border: none; margin: 0; padding: 0;"" seamless sandbox srcdoc=""<style>* { margin: 0; padding: 0;}</style><div style='cursor: pointer; width: 120px; height: 60px; margin: 30px; padding: 15px;' />""></iframe>`
-                ");
+            await DevToolsContext.GoToAsync(TestConstants.ServerUrl + "/frames/one-frame.html");
 
             await DevToolsContext.EvaluateExpressionAsync("new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));");
 
@@ -54,15 +51,13 @@ namespace PuppeteerSharp.Tests.JSHandleTests
 
             var clickablePoint = await divHandle.ClickablePointAsync();
 
-            // iframe pos + margin + middle point offset
-            Assert.Equal(clickablePoint.X, 20 + 45 + 60);
-            Assert.Equal(clickablePoint.Y, 20 + 45 + 30);
+            Assert.Equal(160, clickablePoint.X);
+            Assert.Equal(27, clickablePoint.Y);
 
             clickablePoint = await divHandle.ClickablePointAsync(new Offset { X = 10, Y = 15 });
 
-            // iframe pos + margin + offset
-            Assert.Equal(clickablePoint.X, 20 + 30 + 10);
-            Assert.Equal(clickablePoint.Y, 20 + 30 + 15);
+            Assert.Equal(28, clickablePoint.X);
+            Assert.Equal(33, clickablePoint.Y);
         }
     }
 }

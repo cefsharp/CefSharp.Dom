@@ -288,15 +288,27 @@ namespace CefSharp.Dom
         }
 
         /// <summary>
+        /// Scrolls element into view if needed, and then uses <see cref="Touchscreen.TapAsync(decimal, decimal)"/> to tap the element
+        /// at the specified <see cref="TapOptions.OffSet"/> or in the center of the element if OffSet is null.
+        /// </summary>
+        /// <param name="options">tap options</param>
+        /// <exception cref="PuppeteerException">if the element is detached from DOM</exception>
+        /// <returns>Task which resolves when the element is successfully tapped</returns>
+        public async Task TapAsync(TapOptions options)
+        {
+            await ScrollIntoViewIfNeededAsync().ConfigureAwait(false);
+            var point = await ClickablePointAsync(options?.OffSet).ConfigureAwait(false);
+            await DevToolsContext.Touchscreen.TapAsync(point.X, point.Y).ConfigureAwait(false);
+        }
+
+        /// <summary>
         /// Scrolls element into view if needed, and then uses <see cref="Touchscreen.TapAsync(decimal, decimal)"/> to tap in the center of the element.
         /// </summary>
         /// <exception cref="PuppeteerException">if the element is detached from DOM</exception>
         /// <returns>Task which resolves when the element is successfully tapped</returns>
         public async Task TapAsync()
         {
-            await ScrollIntoViewIfNeededAsync().ConfigureAwait(false);
-            var point = await ClickablePointAsync().ConfigureAwait(false);
-            await DevToolsContext.Touchscreen.TapAsync(point.X, point.Y).ConfigureAwait(false);
+            await TapAsync(null).ConfigureAwait(false);
         }
 
         /// <summary>

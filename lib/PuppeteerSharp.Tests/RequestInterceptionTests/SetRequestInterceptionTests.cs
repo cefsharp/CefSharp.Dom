@@ -247,7 +247,7 @@ namespace PuppeteerSharp.Tests.RequestInterceptionTests
             DevToolsContext.RequestFailed += (_, _) => failedRequests++;
             var response = await DevToolsContext.GoToAsync(TestConstants.ServerUrl + "/one-style.html");
             Assert.True(response.Ok);
-            Assert.Null(response.Request.Failure);
+            Assert.Null(response.Request.FailureText);
             Assert.Equal(1, failedRequests);
         }
 
@@ -264,7 +264,7 @@ namespace PuppeteerSharp.Tests.RequestInterceptionTests
             DevToolsContext.RequestFailed += (_, e) => failedRequest = e.Request;
             await DevToolsContext.GoToAsync(TestConstants.EmptyPage).ContinueWith(_ => { });
             Assert.NotNull(failedRequest);
-            Assert.Equal("net::ERR_INTERNET_DISCONNECTED", failedRequest.Failure);
+            Assert.Equal("net::ERR_INTERNET_DISCONNECTED", failedRequest.FailureText);
         }
 
         [PuppeteerTest("requestinterception.spec.ts", "Page.setRequestInterception", "should send referer")]

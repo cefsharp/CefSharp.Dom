@@ -1,11 +1,7 @@
 namespace CefSharp.Dom.Messaging
 {
-    internal class FetchRequestPausedResponse
+    internal class FetchRequestPausedResponse : RequestWillBeSentResponse
     {
-        public string RequestId { get; set; }
-
-        public Payload Request { get; set; }
-
-        public string NetworkId { get; set; }
+        public ResourceType? ResourceType { get; set; }
     }
 }

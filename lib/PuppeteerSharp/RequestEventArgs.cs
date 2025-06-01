@@ -11,9 +11,18 @@ namespace CefSharp.Dom
     public class RequestEventArgs : EventArgs
     {
         /// <summary>
+        /// RequestEventArgs
+        /// </summary>
+        /// <param name="request">request</param>
+        public RequestEventArgs(Request request)
+        {
+            Request = request;
+        }
+
+        /// <summary>
         /// Gets or sets the request.
         /// </summary>
         /// <value>The request.</value>
-        public Request Request { get; internal set; }
+        public Request Request { get; }
     }
 }

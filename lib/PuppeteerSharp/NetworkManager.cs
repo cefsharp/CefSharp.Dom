@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Threading.Tasks;
+using CefSharp.DevTools.Emulation;
 using CefSharp.Dom.Helpers;
 using CefSharp.Dom.Helpers.Json;
 using CefSharp.Dom.Messaging;
@@ -11,34 +13,36 @@ namespace CefSharp.Dom
 {
     internal class NetworkManager
     {
-        private readonly DevToolsConnection _connection;
+        private readonly bool _acceptInsecureCerts;
+        private readonly NetworkEventManager _networkEventManager = new ();
         private readonly ILogger _logger;
         private readonly ConcurrentSet<string> _attemptedAuthentications = new ConcurrentSet<string>();
-        private readonly InternalNetworkConditions _emulatedNetworkConditions = new InternalNetworkConditions
-        {
-            Offline = false,
-            Upload = -1,
-            Download = -1,
-            Latency = 0,
-        };
+        private readonly ConcurrentDictionary<DevToolsConnection, DisposableActionsStack> _clients = new ();
+        private readonly IFrameProvider _frameManager;
+        private readonly ILoggerFactory _loggerFactory;
 
-        private readonly NetworkEventManager _networkEventManager = new NetworkEventManager();
-
+        private InternalNetworkConditions _emulatedNetworkConditions;
         private Dictionary<string, string> _extraHTTPHeaders;
         private Credentials _credentials;
         private bool _userRequestInterceptionEnabled;
-        private bool _userCacheDisabled;
         private bool _protocolRequestInterceptionEnabled;
+        private bool? _userCacheDisabled;
+        private string _userAgent;
+        private UserAgentMetadata _userAgentMetadata;
 
-        internal NetworkManager(DevToolsConnection connection, FrameManager frameManager)
+        /// <summary>
+        /// Initializes a new instance of the <see cref="NetworkManager"/> class.
+        /// </summary>
+        /// <param name="acceptInsecureCerts">If set to <c>true</c> ignore http errors.</param>
+        /// <param name="frameManager">Frame manager.</param>
+        /// <param name="loggerFactory">Logger factory.</param>
+        internal NetworkManager(bool acceptInsecureCerts, IFrameProvider frameManager, ILoggerFactory loggerFactory)
         {
-            FrameManager = frameManager;
-            _connection = connection;
-            _connection.MessageReceived += OnConnectionMessageReceived;
-            _logger = _connection.LoggerFactory.CreateLogger<NetworkManager>();
+            _frameManager = frameManager;
+            _acceptInsecureCerts = acceptInsecureCerts;
+            _loggerFactory = loggerFactory;
+            _logger = loggerFactory.CreateLogger<NetworkManager>();
         }
-
-        internal Dictionary<string, string> ExtraHTTPHeaders => _extraHTTPHeaders?.Clone();
 
         internal event EventHandler<ResponseCreatedEventArgs> Response;
 
@@ -50,14 +54,52 @@ namespace CefSharp.Dom
 
         internal event EventHandler<RequestEventArgs> RequestServedFromCache;
 
-        internal FrameManager FrameManager { get; set; }
+        internal Dictionary<string, string> ExtraHTTPHeaders => _extraHTTPHeaders?.Clone();
 
-        internal int NumRequestsInProgress => _networkEventManager.NumRequestsInProgress;
+        internal Task AddClientAsync(DevToolsConnection client)
+        {
+            if (_clients.ContainsKey(client))
+            {
+                return Task.CompletedTask;
+            }
 
-        internal Task AuthenticateAsync(Credentials credentials)
+            var subscriptions = new DisposableActionsStack();
+            _clients[client] = subscriptions;
+            client.MessageReceived += Client_MessageReceived;
+            subscriptions.Defer(() => client.MessageReceived -= Client_MessageReceived);
+
+            return Task.WhenAll(
+                _acceptInsecureCerts ? client.SendAsync("Security.setIgnoreCertificateErrors", new SecuritySetIgnoreCertificateErrorsRequest { Ignore = true }) : Task.CompletedTask,
+                client.SendAsync("Network.enable"),
+                ApplyExtraHTTPHeadersAsync(client),
+                ApplyNetworkConditionsAsync(client),
+                ApplyProtocolCacheDisabledAsync(client),
+                ApplyProtocolRequestInterceptionAsync(client),
+                ApplyUserAgentAsync(client));
+        }
+
+        internal void RemoveClient(DevToolsConnection client)
+        {
+            if (!_clients.TryRemove(client, out var subscriptions))
+            {
+                return;
+            }
+
+            subscriptions.Dispose();
+        }
+
+        internal async Task AuthenticateAsync(Credentials credentials)
         {
             _credentials = credentials;
-            return UpdateProtocolRequestInterceptionAsync();
+            var enabled = _userRequestInterceptionEnabled || _credentials != null;
+
+            if (enabled == _protocolRequestInterceptionEnabled)
+            {
+                return;
+            }
+
+            _protocolRequestInterceptionEnabled = enabled;
+            await ApplyToAllClientsAsync(ApplyProtocolRequestInterceptionAsync).ConfigureAwait(false);
         }
 
         internal Task SetExtraHTTPHeadersAsync(Dictionary<string, string> extraHTTPHeaders)
@@ -68,88 +110,83 @@ namespace CefSharp.Dom
             {
                 _extraHTTPHeaders[item.Key.ToLower(CultureInfo.CurrentCulture)] = item.Value;
             }
-            return _connection.SendAsync("Network.setExtraHTTPHeaders", new NetworkSetExtraHTTPHeadersRequest
-            {
-                Headers = _extraHTTPHeaders
-            });
+
+            return ApplyToAllClientsAsync(ApplyExtraHTTPHeadersAsync);
         }
 
-        internal async Task SetOfflineModeAsync(bool value)
+        internal Task SetUserAgentAsync(string userAgent, UserAgentMetadata userAgentMetadata)
         {
-            _emulatedNetworkConditions.Offline = value;
-            await UpdateNetworkConditionsAsync().ConfigureAwait(false);
+            _userAgent = userAgent;
+            _userAgentMetadata = userAgentMetadata;
+            return ApplyToAllClientsAsync(ApplyUserAgentAsync);
         }
-
-        internal async Task EmulateNetworkConditionsAsync(NetworkConditions networkConditions)
-        {
-            _emulatedNetworkConditions.Upload = networkConditions?.Upload ?? -1;
-            _emulatedNetworkConditions.Download = networkConditions?.Download ?? -1;
-            _emulatedNetworkConditions.Latency = networkConditions?.Latency ?? 0;
-            await UpdateNetworkConditionsAsync().ConfigureAwait(false);
-        }
-
-        private Task UpdateNetworkConditionsAsync()
-            => _connection.SendAsync("Network.emulateNetworkConditions", new NetworkEmulateNetworkConditionsRequest
-            {
-                Offline = _emulatedNetworkConditions.Offline,
-                Latency = _emulatedNetworkConditions.Latency,
-                UploadThroughput = _emulatedNetworkConditions.Upload,
-                DownloadThroughput = _emulatedNetworkConditions.Download,
-            });
-
-        internal Task SetUserAgentAsync(string userAgent)
-            => _connection.SendAsync("Network.setUserAgentOverride", new NetworkSetUserAgentOverrideRequest
-            {
-                UserAgent = userAgent
-            });
 
         internal Task SetCacheEnabledAsync(bool enabled)
         {
             _userCacheDisabled = !enabled;
-            return UpdateProtocolCacheDisabledAsync();
+            return ApplyToAllClientsAsync(ApplyProtocolCacheDisabledAsync);
         }
 
-        internal Task SetRequestInterceptionAsync(bool value)
+        internal async Task SetRequestInterceptionAsync(bool value)
         {
             _userRequestInterceptionEnabled = value;
-            return UpdateProtocolRequestInterceptionAsync();
+            var enabled = _userRequestInterceptionEnabled || _credentials != null;
+
+            if (enabled == _protocolRequestInterceptionEnabled)
+            {
+                return;
+            }
+
+            _protocolRequestInterceptionEnabled = enabled;
+            await ApplyToAllClientsAsync(ApplyProtocolRequestInterceptionAsync).ConfigureAwait(false);
         }
 
-        private Task UpdateProtocolCacheDisabledAsync()
-            => _connection.SendAsync("Network.setCacheDisabled", new NetworkSetCacheDisabledRequest
-            {
-                CacheDisabled = _userCacheDisabled
-            });
+        internal Task SetOfflineModeAsync(bool value)
+        {
+            _emulatedNetworkConditions ??= new InternalNetworkConditions();
+            _emulatedNetworkConditions.Offline = value;
+            return ApplyToAllClientsAsync(ApplyNetworkConditionsAsync);
+        }
 
-        private async void OnConnectionMessageReceived(object sender, MessageEventArgs e)
+        internal Task EmulateNetworkConditionsAsync(NetworkConditions networkConditions)
+        {
+            _emulatedNetworkConditions ??= new InternalNetworkConditions();
+            _emulatedNetworkConditions.Upload = networkConditions?.Upload ?? -1;
+            _emulatedNetworkConditions.Download = networkConditions?.Download ?? -1;
+            _emulatedNetworkConditions.Latency = networkConditions?.Latency ?? 0;
+            return ApplyToAllClientsAsync(ApplyNetworkConditionsAsync);
+        }
+
+        private async void Client_MessageReceived(object sender, MessageEventArgs e)
         {
             try
             {
+                var client = sender as DevToolsConnection;
                 switch (e.MessageID)
                 {
                     case "Fetch.requestPaused":
-                        await OnRequestPausedAsync(e.MessageData.ToObject<FetchRequestPausedResponse>(true)).ConfigureAwait(false);
+                        await OnRequestPausedAsync(client, e.MessageData.ToObject<FetchRequestPausedResponse>()).ConfigureAwait(false);
                         break;
                     case "Fetch.authRequired":
-                        await OnAuthRequiredAsync(e.MessageData.ToObject<FetchAuthRequiredResponse>(true)).ConfigureAwait(false);
+                        await OnAuthRequiredAsync(client, e.MessageData.ToObject<FetchAuthRequiredResponse>()).ConfigureAwait(false);
                         break;
                     case "Network.requestWillBeSent":
-                        await OnRequestWillBeSentAsync(e.MessageData.ToObject<RequestWillBeSentPayload>(true)).ConfigureAwait(false);
+                        await OnRequestWillBeSentAsync(client, e.MessageData.ToObject<RequestWillBeSentResponse>()).ConfigureAwait(false);
                         break;
                     case "Network.requestServedFromCache":
-                        OnRequestServedFromCache(e.MessageData.ToObject<RequestServedFromCacheResponse>(true));
+                        OnRequestServedFromCache(e.MessageData.ToObject<RequestServedFromCacheResponse>());
                         break;
                     case "Network.responseReceived":
-                        OnResponseReceived(e.MessageData.ToObject<ResponseReceivedResponse>(true));
+                        OnResponseReceived(client, e.MessageData.ToObject<ResponseReceivedResponse>());
                         break;
                     case "Network.loadingFinished":
-                        OnLoadingFinished(e.MessageData.ToObject<LoadingFinishedEventResponse>(true));
+                        OnLoadingFinished(e.MessageData.ToObject<LoadingFinishedEventResponse>());
                         break;
                     case "Network.loadingFailed":
-                        OnLoadingFailed(e.MessageData.ToObject<LoadingFailedEventResponse>(true));
+                        OnLoadingFailed(e.MessageData.ToObject<LoadingFailedEventResponse>());
                         break;
                     case "Network.responseReceivedExtraInfo":
-                        await OnResponseReceivedExtraInfoAsync(e.MessageData.ToObject<ResponseReceivedExtraInfoResponse>(true)).ConfigureAwait(false);
+                        await OnResponseReceivedExtraInfoAsync(sender as DevToolsConnection, e.MessageData.ToObject<ResponseReceivedExtraInfoResponse>()).ConfigureAwait(false);
                         break;
                 }
             }
@@ -157,18 +194,22 @@ namespace CefSharp.Dom
             {
                 var message = $"NetworkManager failed to process {e.MessageID}. {ex.Message}. {ex.StackTrace}";
                 _logger.LogError(ex, message);
-                _connection.Close(message);
+                _ = ApplyToAllClientsAsync(client =>
+                {
+                    (client as DevToolsConnection)?.Close(message);
+                    return Task.CompletedTask;
+                });
             }
         }
 
-        private async Task OnResponseReceivedExtraInfoAsync(ResponseReceivedExtraInfoResponse e)
+        private async Task OnResponseReceivedExtraInfoAsync(DevToolsConnection client, ResponseReceivedExtraInfoResponse e)
         {
             var redirectInfo = _networkEventManager.TakeQueuedRedirectInfo(e.RequestId);
 
             if (redirectInfo != null)
             {
                 _networkEventManager.ResponseExtraInfo(e.RequestId).Add(e);
-                await OnRequestAsync(redirectInfo.Event, redirectInfo.FetchRequestId).ConfigureAwait(false);
+                await OnRequestAsync(client, redirectInfo.Event, redirectInfo.FetchRequestId).ConfigureAwait(false);
                 return;
             }
 
@@ -178,18 +219,19 @@ namespace CefSharp.Dom
 
             if (queuedEvents != null)
             {
-                EmitResponseEvent(queuedEvents.ResponseReceivedEvent, e);
-
-                if (queuedEvents.LoadingFinishedEvent != null) {
-                    OnLoadingFinished(queuedEvents.LoadingFinishedEvent);
-                }
-
-                if (queuedEvents.LoadingFailedEvent != null) {
-                    OnLoadingFailed(queuedEvents.LoadingFailedEvent);
-                }
-
-                // We need this in .NET to avoid race conditions
                 _networkEventManager.ForgetQueuedEventGroup(e.RequestId);
+                EmitResponseEvent(client, queuedEvents.ResponseReceivedEvent, e);
+
+                if (queuedEvents.LoadingFinishedEvent != null)
+                {
+                    EmitLoadingFinished(queuedEvents.LoadingFinishedEvent);
+                }
+
+                if (queuedEvents.LoadingFailedEvent != null)
+                {
+                    EmitLoadingFailed(queuedEvents.LoadingFailedEvent);
+                }
+
                 return;
             }
 
@@ -219,15 +261,12 @@ namespace CefSharp.Dom
                 return;
             }
 
-            request.Failure = e.ErrorText;
+            request.FailureText = e.ErrorText;
             request.Response?.BodyLoadedTaskWrapper.TrySetResult(true);
 
             ForgetRequest(request, true);
 
-            RequestFailed?.Invoke(this, new RequestEventArgs
-            {
-                Request = request
-            });
+            RequestFailed?.Invoke(this, new RequestEventArgs { Request = request });
         }
 
         private void OnLoadingFinished(LoadingFinishedEventResponse e)
@@ -255,11 +294,7 @@ namespace CefSharp.Dom
             request.Response?.BodyLoadedTaskWrapper.TrySetResult(true);
 
             ForgetRequest(request, true);
-
-            RequestFinished?.Invoke(this, new RequestEventArgs
-            {
-                Request = request
-            });
+            RequestFinished?.Invoke(this, new RequestEventArgs { Request = request });
         }
 
         private void ForgetRequest(Request request, bool events)
@@ -277,54 +312,52 @@ namespace CefSharp.Dom
             }
         }
 
-        private void OnResponseReceived(ResponseReceivedResponse e)
+        private void OnResponseReceived(DevToolsConnection client, ResponseReceivedResponse e)
         {
             var request = _networkEventManager.GetRequest(e.RequestId);
             ResponseReceivedExtraInfoResponse extraInfo = null;
 
-            if (request != null && !request.FromMemoryCache && e.HasExtraInfo)
+            if (request is { FromMemoryCache: false } && e.HasExtraInfo)
             {
                 extraInfo = _networkEventManager.ShiftResponseExtraInfo(e.RequestId);
 
                 if (extraInfo == null)
                 {
-                    _networkEventManager.QueuedEventGroup(e.RequestId, new QueuedEventGroup
-                    {
-                        ResponseReceivedEvent = e
-                    });
+                    _networkEventManager.QueuedEventGroup(e.RequestId, new () { ResponseReceivedEvent = e });
                     return;
                 }
             }
 
-            EmitResponseEvent(e, extraInfo);
+            EmitResponseEvent(client, e, extraInfo);
         }
 
-        private void EmitResponseEvent(ResponseReceivedResponse e, ResponseReceivedExtraInfoResponse extraInfo)
+        private void EmitResponseEvent(DevToolsConnection client, ResponseReceivedResponse e, ResponseReceivedExtraInfoResponse extraInfo)
         {
             var request = _networkEventManager.GetRequest(e.RequestId);
 
             // FileUpload sends a response without a matching request.
-
             if (request == null)
             {
                 return;
             }
 
+            if (e.Response.FromDiskCache)
+            {
+                extraInfo = null;
+            }
+
             var response = new Response(
-                _connection,
+                client,
                 request,
                 e.Response,
                 extraInfo);
 
             request.Response = response;
 
-            Response?.Invoke(this, new ResponseCreatedEventArgs
-            {
-                Response = response
-            });
+            Response?.Invoke(this, new ResponseCreatedEventArgs(response));
         }
 
-        private async Task OnAuthRequiredAsync(FetchAuthRequiredResponse e)
+        private async Task OnAuthRequiredAsync(DevToolsConnection client, FetchAuthRequiredResponse e)
         {
             var response = "Default";
             if (_attemptedAuthentications.Contains(e.RequestId))
@@ -336,18 +369,19 @@ namespace CefSharp.Dom
                 response = "ProvideCredentials";
                 _attemptedAuthentications.Add(e.RequestId);
             }
+
             var credentials = _credentials ?? new Credentials();
             try
             {
-                await _connection.SendAsync("Fetch.continueWithAuth", new ContinueWithAuthRequest
+                await client.SendAsync("Fetch.continueWithAuth", new ContinueWithAuthRequest
                 {
                     RequestId = e.RequestId,
                     AuthChallengeResponse = new ContinueWithAuthRequestChallengeResponse
                     {
                         Response = response,
                         Username = credentials.Username,
-                        Password = credentials.Password
-                    }
+                        Password = credentials.Password,
+                    },
                 }).ConfigureAwait(false);
             }
             catch (PuppeteerException ex)
@@ -356,15 +390,15 @@ namespace CefSharp.Dom
             }
         }
 
-        private async Task OnRequestPausedAsync(FetchRequestPausedResponse e)
+        private async Task OnRequestPausedAsync(DevToolsConnection client, FetchRequestPausedResponse e)
         {
             if (!_userRequestInterceptionEnabled && _protocolRequestInterceptionEnabled)
             {
                 try
                 {
-                    await _connection.SendAsync("Fetch.continueRequest", new FetchContinueRequestRequest
+                    await client.SendAsync("Fetch.continueRequest", new FetchContinueRequestRequest
                     {
-                        RequestId = e.RequestId
+                        RequestId = e.RequestId,
                     }).ConfigureAwait(false);
                 }
                 catch (PuppeteerException ex)
@@ -375,11 +409,11 @@ namespace CefSharp.Dom
 
             if (string.IsNullOrEmpty(e.NetworkId))
             {
+                OnRequestWithoutNetworkInstrumentationAsync(client, e);
                 return;
             }
 
-            var requestWillBeSentEvent =
-              _networkEventManager.GetRequestWillBeSent(e.NetworkId);
+            var requestWillBeSentEvent = _networkEventManager.GetRequestWillBeSent(e.NetworkId);
 
             // redirect requests have the same `requestId`,
             if (
@@ -394,7 +428,7 @@ namespace CefSharp.Dom
             if (requestWillBeSentEvent != null)
             {
                 PatchRequestEventHeaders(requestWillBeSentEvent, e);
-                await OnRequestAsync(requestWillBeSentEvent, e.RequestId).ConfigureAwait(false);
+                await OnRequestAsync(client, requestWillBeSentEvent, e.RequestId).ConfigureAwait(false);
             }
             else
             {
@@ -402,10 +436,30 @@ namespace CefSharp.Dom
             }
         }
 
-        private async Task OnRequestAsync(RequestWillBeSentPayload e, string fetchRequestId)
+        private async void OnRequestWithoutNetworkInstrumentationAsync(DevToolsConnection client, FetchRequestPausedResponse e)
+        {
+            // If an event has no networkId it should not have any network events. We
+            // still want to dispatch it for the interception by the user.
+            var frame = !string.IsNullOrEmpty(e.FrameId)
+                ? await _frameManager.GetFrameAsync(e.FrameId).ConfigureAwait(false)
+                : null;
+
+            var request = new Request(
+                    client,
+                    frame,
+                    e.RequestId,
+                    _userRequestInterceptionEnabled,
+                    e,
+                    []);
+
+            Request?.Invoke(this, new RequestEventArgs(request));
+            _ = request.FinalizeInterceptionsAsync();
+        }
+
+        private async Task OnRequestAsync(DevToolsConnection client, RequestWillBeSentResponse e, string fetchRequestId)
         {
             Request request;
-            var redirectChain = new List<Request>();
+            var redirectChain = new List<IRequest>();
             if (e.RedirectResponse != null)
             {
                 ResponseReceivedExtraInfoResponse redirectResponseExtraInfo = null;
@@ -414,11 +468,7 @@ namespace CefSharp.Dom
                     redirectResponseExtraInfo = _networkEventManager.ShiftResponseExtraInfo(e.RequestId);
                     if (redirectResponseExtraInfo == null)
                     {
-                        _networkEventManager.QueueRedirectInfo(e.RequestId, new RedirectInfo
-                        {
-                            Event = e,
-                            FetchRequestId = fetchRequestId,
-                        });
+                        _networkEventManager.QueueRedirectInfo(e.RequestId, new () { Event = e, FetchRequestId = fetchRequestId });
                         return;
                     }
                 }
@@ -428,15 +478,15 @@ namespace CefSharp.Dom
                 // If we connect late to the target, we could have missed the requestWillBeSent event.
                 if (request != null)
                 {
-                    HandleRequestRedirect(request, e.RedirectResponse, redirectResponseExtraInfo);
+                    HandleRequestRedirect(client, request, e.RedirectResponse, redirectResponseExtraInfo);
                     redirectChain = request.RedirectChainList;
                 }
             }
 
-            var frame = !string.IsNullOrEmpty(e.FrameId) ? await FrameManager.TryGetFrameAsync(e.FrameId).ConfigureAwait(false) : null;
+            var frame = !string.IsNullOrEmpty(e.FrameId) ? await _frameManager.GetFrameAsync(e.FrameId).ConfigureAwait(false) : null;
 
             request = new Request(
-                _connection,
+                client,
                 frame,
                 fetchRequestId,
                 _userRequestInterceptionEnabled,
@@ -445,10 +495,16 @@ namespace CefSharp.Dom
 
             _networkEventManager.StoreRequest(e.RequestId, request);
 
-            Request?.Invoke(this, new RequestEventArgs
+            Request?.Invoke(this, new RequestEventArgs(request));
+
+            try
             {
-                Request = request
-            });
+                await request.FinalizeInterceptionsAsync().ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to FinalizeInterceptionsAsync");
+            }
         }
 
         private void OnRequestServedFromCache(RequestServedFromCacheResponse response)
@@ -459,13 +515,14 @@ namespace CefSharp.Dom
             {
                 request.FromMemoryCache = true;
             }
-            RequestServedFromCache?.Invoke(this, new RequestEventArgs { Request = request });
+
+            RequestServedFromCache?.Invoke(this, new RequestEventArgs(request));
         }
 
-        private void HandleRequestRedirect(Request request, ResponsePayload responseMessage, ResponseReceivedExtraInfoResponse extraInfo)
+        private void HandleRequestRedirect(DevToolsConnection client, Request request, ResponsePayload responseMessage, ResponseReceivedExtraInfoResponse extraInfo)
         {
             var response = new Response(
-                _connection,
+                client,
                 request,
                 responseMessage,
                 extraInfo);
@@ -477,18 +534,11 @@ namespace CefSharp.Dom
 
             ForgetRequest(request, false);
 
-            Response?.Invoke(this, new ResponseCreatedEventArgs
-            {
-                Response = response
-            });
-
-            RequestFinished?.Invoke(this, new RequestEventArgs
-            {
-                Request = request
-            });
+            Response?.Invoke(this, new ResponseCreatedEventArgs(response));
+            RequestFinished?.Invoke(this, new RequestEventArgs(request));
         }
 
-        private async Task OnRequestWillBeSentAsync(RequestWillBeSentPayload e)
+        private async Task OnRequestWillBeSentAsync(DevToolsConnection client, RequestWillBeSentResponse e)
         {
             // Request interception doesn't happen for data URLs with Network Service.
             if (_userRequestInterceptionEnabled && !e.Request.Url.StartsWith("data:", StringComparison.InvariantCultureIgnoreCase))
@@ -500,16 +550,17 @@ namespace CefSharp.Dom
                 {
                     var fetchRequestId = requestPausedEvent.RequestId;
                     PatchRequestEventHeaders(e, requestPausedEvent);
-                    await OnRequestAsync(e, fetchRequestId).ConfigureAwait(false);
+                    await OnRequestAsync(client, e, fetchRequestId).ConfigureAwait(false);
                     _networkEventManager.ForgetRequestPaused(e.RequestId);
                 }
 
                 return;
             }
-            await OnRequestAsync(e, null).ConfigureAwait(false);
+
+            await OnRequestAsync(client, e, null).ConfigureAwait(false);
         }
 
-        private void PatchRequestEventHeaders(RequestWillBeSentPayload requestWillBeSentEvent, FetchRequestPausedResponse requestPausedEvent)
+        private void PatchRequestEventHeaders(RequestWillBeSentResponse requestWillBeSentEvent, FetchRequestPausedResponse requestPausedEvent)
         {
             foreach (var kv in requestPausedEvent.Request.Headers)
             {
@@ -517,31 +568,89 @@ namespace CefSharp.Dom
             }
         }
 
-        private async Task UpdateProtocolRequestInterceptionAsync()
+        private async Task ApplyUserAgentAsync(DevToolsConnection client)
         {
-            var enabled = _userRequestInterceptionEnabled || _credentials != null;
-
-            if (enabled == _protocolRequestInterceptionEnabled)
+            if (_userAgent == null)
             {
                 return;
             }
-            _protocolRequestInterceptionEnabled = enabled;
-            if (enabled)
+
+            await client.SendAsync(
+                "Network.setUserAgentOverride",
+                new NetworkSetUserAgentOverrideRequest
+                {
+                    UserAgent = _userAgent,
+                    UserAgentMetadata = _userAgentMetadata,
+                }).ConfigureAwait(false);
+        }
+
+        private async Task ApplyProtocolRequestInterceptionAsync(DevToolsConnection client)
+        {
+            _userCacheDisabled ??= false;
+
+            if (_protocolRequestInterceptionEnabled)
             {
                 await Task.WhenAll(
-                    UpdateProtocolCacheDisabledAsync(),
-                    _connection.SendAsync("Fetch.enable", new FetchEnableRequest
-                    {
-                        HandleAuthRequests = true,
-                        Patterns = new[] { new FetchEnableRequest.Pattern { UrlPattern = "*" } }
-                    })).ConfigureAwait(false);
+                    ApplyProtocolCacheDisabledAsync(client),
+                    client.SendAsync(
+                        "Fetch.enable",
+                        new FetchEnableRequest
+                        {
+                            HandleAuthRequests = true,
+                            Patterns = [new FetchEnableRequest.Pattern("*")],
+                        })).ConfigureAwait(false);
             }
             else
             {
                 await Task.WhenAll(
-                    UpdateProtocolCacheDisabledAsync(),
-                    _connection.SendAsync("Fetch.disable")).ConfigureAwait(false);
+                    ApplyProtocolCacheDisabledAsync(client),
+                    client.SendAsync("Fetch.disable")).ConfigureAwait(false);
             }
         }
+
+        private async Task ApplyProtocolCacheDisabledAsync(DevToolsConnection client)
+        {
+            if (_userCacheDisabled == null)
+            {
+                return;
+            }
+
+            await client.SendAsync(
+                "Network.setCacheDisabled",
+                new NetworkSetCacheDisabledRequest(_userCacheDisabled.Value)).ConfigureAwait(false);
+        }
+
+        private async Task ApplyNetworkConditionsAsync(DevToolsConnection client)
+        {
+            if (_emulatedNetworkConditions == null)
+            {
+                return;
+            }
+
+            await client.SendAsync(
+                "Network.emulateNetworkConditions",
+                new NetworkEmulateNetworkConditionsRequest
+                {
+                    Offline = _emulatedNetworkConditions.Offline,
+                    Latency = _emulatedNetworkConditions.Latency,
+                    UploadThroughput = _emulatedNetworkConditions.Upload,
+                    DownloadThroughput = _emulatedNetworkConditions.Download,
+                }).ConfigureAwait(false);
+        }
+
+        private async Task ApplyExtraHTTPHeadersAsync(DevToolsConnection client)
+        {
+            if (_extraHTTPHeaders == null)
+            {
+                return;
+            }
+
+            await client.SendAsync(
+                "Network.setExtraHTTPHeaders",
+                new NetworkSetExtraHTTPHeadersRequest(_extraHTTPHeaders)).ConfigureAwait(false);
+        }
+
+        private Task ApplyToAllClientsAsync(Func<DevToolsConnection, Task> func)
+            => Task.WhenAll(_clients.Keys.Select(func));
     }
 }

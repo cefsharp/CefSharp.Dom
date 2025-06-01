@@ -26,6 +26,7 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <!-- Don't need to copy the CEF files to our output folder so set NoAction -->
     <CefSharpBuildAction>NoAction</CefSharpBuildAction>
+    <LangVersion>latest</LangVersion>
   </PropertyGroup>
   <Import Project="../Common/SignAssembly.props" />
 

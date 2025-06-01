@@ -8,9 +8,18 @@ namespace CefSharp.Dom
     public class ResponseCreatedEventArgs : EventArgs
     {
         /// <summary>
+        /// ResponseCreatedEventArgs
+        /// </summary>
+        /// <param name="response">response</param>
+        public ResponseCreatedEventArgs(Response response)
+        {
+            Response = response;
+        }
+
+        /// <summary>
         /// Gets or sets the response.
         /// </summary>
         /// <value>The response.</value>
-        public Response Response { get; internal set; }
+        public Response Response { get; }
     }
 }

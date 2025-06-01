@@ -7,12 +7,12 @@ namespace CefSharp.Dom
 {
     internal class NetworkEventManager
     {
-        private readonly ConcurrentDictionary<string, RequestWillBeSentPayload> _requestWillBeSentMap = new ConcurrentDictionary<string, RequestWillBeSentPayload>();
-        private readonly ConcurrentDictionary<string, FetchRequestPausedResponse> _requestPausedMap = new ConcurrentDictionary<string, FetchRequestPausedResponse>();
-        private readonly ConcurrentDictionary<string, Request> _httpRequestsMap = new ConcurrentDictionary<string, Request>();
-        private readonly ConcurrentDictionary<string, QueuedEventGroup> _queuedEventGroupMap = new ConcurrentDictionary<string, QueuedEventGroup>();
-        private readonly ConcurrentDictionary<string, List<RedirectInfo>> _queuedRedirectInfoMap = new ConcurrentDictionary<string, List<RedirectInfo>>();
-        private readonly ConcurrentDictionary<string, List<ResponseReceivedExtraInfoResponse>> _responseReceivedExtraInfoMap = new ConcurrentDictionary<string, List<ResponseReceivedExtraInfoResponse>>();
+        private readonly ConcurrentDictionary<string, RequestWillBeSentResponse> _requestWillBeSentMap = new ();
+        private readonly ConcurrentDictionary<string, FetchRequestPausedResponse> _requestPausedMap = new ();
+        private readonly ConcurrentDictionary<string, Request> _httpRequestsMap = new ();
+        private readonly ConcurrentDictionary<string, QueuedEventGroup> _queuedEventGroupMap = new ();
+        private readonly ConcurrentDictionary<string, List<RedirectInfo>> _queuedRedirectInfoMap = new ();
+        private readonly ConcurrentDictionary<string, List<ResponseReceivedExtraInfoResponse>> _responseReceivedExtraInfoMap = new ();
 
         internal void Forget(string requestId)
         {
@@ -25,27 +25,7 @@ namespace CefSharp.Dom
         }
 
         internal List<ResponseReceivedExtraInfoResponse> ResponseExtraInfo(string networkRequestId)
-        {
-            if (!_responseReceivedExtraInfoMap.ContainsKey(networkRequestId))
-            {
-                _responseReceivedExtraInfoMap.AddOrUpdate(
-                    networkRequestId,
-                    new List<ResponseReceivedExtraInfoResponse>(),
-                    (_, __) => new List<ResponseReceivedExtraInfoResponse>());
-            }
-            _responseReceivedExtraInfoMap.TryGetValue(networkRequestId, out var result);
-            return result;
-        }
-
-        private List<RedirectInfo> QueuedRedirectInfo(string fetchRequestId)
-        {
-            if (!_queuedRedirectInfoMap.ContainsKey(fetchRequestId))
-            {
-                _queuedRedirectInfoMap.TryAdd(fetchRequestId, new List<RedirectInfo>());
-            }
-            _queuedRedirectInfoMap.TryGetValue(fetchRequestId, out var result);
-            return result;
-        }
+            => _responseReceivedExtraInfoMap.GetOrAdd(networkRequestId, static _ => new ());
 
         internal void QueueRedirectInfo(string fetchRequestId, RedirectInfo redirectInfo)
             => QueuedRedirectInfo(fetchRequestId).Add(redirectInfo);
@@ -63,17 +43,9 @@ namespace CefSharp.Dom
             return result;
         }
 
-        public int NumRequestsInProgress
-            => _httpRequestsMap.Values.Count(r => r.Response == null);
-
         internal ResponseReceivedExtraInfoResponse ShiftResponseExtraInfo(string networkRequestId)
         {
-            if (!_responseReceivedExtraInfoMap.ContainsKey(networkRequestId))
-            {
-                _responseReceivedExtraInfoMap.TryAdd(networkRequestId, new List<ResponseReceivedExtraInfoResponse>());
-            }
-
-            _responseReceivedExtraInfoMap.TryGetValue(networkRequestId, out var list);
+            var list = _responseReceivedExtraInfoMap.GetOrAdd(networkRequestId, static _ => new ());
             var result = list.FirstOrDefault();
 
             if (result != null)
@@ -84,10 +56,10 @@ namespace CefSharp.Dom
             return result;
         }
 
-        internal void StoreRequestWillBeSent(string networkRequestId, RequestWillBeSentPayload e)
-            => _requestWillBeSentMap.AddOrUpdate(networkRequestId, e, (_, __) => e);
+        internal void StoreRequestWillBeSent(string networkRequestId, RequestWillBeSentResponse e)
+            => _requestWillBeSentMap.AddOrUpdate(networkRequestId, e, (_, _) => e);
 
-        internal RequestWillBeSentPayload GetRequestWillBeSent(string networkRequestId)
+        internal RequestWillBeSentResponse GetRequestWillBeSent(string networkRequestId)
         {
             _requestWillBeSentMap.TryGetValue(networkRequestId, out var result);
             return result;
@@ -106,7 +78,7 @@ namespace CefSharp.Dom
             => _requestPausedMap.TryRemove(networkRequestId, out _);
 
         internal void StoreRequestPaused(string networkRequestId, FetchRequestPausedResponse e)
-            => _requestPausedMap.AddOrUpdate(networkRequestId, e, (_, __) => e);
+            => _requestPausedMap.AddOrUpdate(networkRequestId, e, (_, _) => e);
 
         internal Request GetRequest(string networkRequestId)
         {
@@ -115,13 +87,13 @@ namespace CefSharp.Dom
         }
 
         internal void StoreRequest(string networkRequestId, Request request)
-            => _httpRequestsMap.AddOrUpdate(networkRequestId, request, (_, __) => request);
+            => _httpRequestsMap.AddOrUpdate(networkRequestId, request, (_, _) => request);
 
         internal void ForgetRequest(string requestId)
             => _requestWillBeSentMap.TryRemove(requestId, out _);
 
         internal void QueuedEventGroup(string networkRequestId, QueuedEventGroup group)
-            => _queuedEventGroupMap.AddOrUpdate(networkRequestId, group, (_, __) => group);
+            => _queuedEventGroupMap.AddOrUpdate(networkRequestId, group, (_, _) => group);
 
         internal QueuedEventGroup GetQueuedEventGroup(string networkRequestId)
         {
@@ -132,5 +104,8 @@ namespace CefSharp.Dom
         // Puppeteer doesn't have this. but it seems that .NET needs this to avoid race conditions
         internal void ForgetQueuedEventGroup(string networkRequestId)
             => _queuedEventGroupMap.TryRemove(networkRequestId, out _);
+
+        private List<RedirectInfo> QueuedRedirectInfo(string fetchRequestId)
+            => _queuedRedirectInfoMap.GetOrAdd(fetchRequestId, static _ => new ());
     }
 }

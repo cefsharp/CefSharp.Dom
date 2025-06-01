@@ -1,40 +1,35 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics.Contracts;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using CefSharp.DevTools.Page;
 using CefSharp.Dom.Helpers;
+using CefSharp.Dom;
+using CefSharp;
+using PuppeteerSharp.Cdp.Messaging;
+using PuppeteerSharp.Helpers;
 
 namespace CefSharp.Dom
 {
-    internal class LifecycleWatcher : IDisposable
+    internal sealed class LifecycleWatcher : IDisposable
     {
-        private static readonly Dictionary<WaitUntilNavigation, string> _puppeteerToProtocolLifecycle =
-            new Dictionary<WaitUntilNavigation, string>
-            {
-                [WaitUntilNavigation.Load] = "load",
-                [WaitUntilNavigation.DOMContentLoaded] = "DOMContentLoaded",
-                [WaitUntilNavigation.Networkidle0] = "networkIdle",
-                [WaitUntilNavigation.Networkidle2] = "networkAlmostIdle"
-            };
+        private static readonly WaitUntilNavigation[] _defaultWaitUntil = [WaitUntilNavigation.Load];
 
-        private static readonly WaitUntilNavigation[] _defaultWaitUntil = { WaitUntilNavigation.Load };
-
-        private readonly FrameManager _frameManager;
-        private readonly Frame _frame;
+        private readonly NetworkManager _networkManager;
+        private readonly CdpFrame _frame;
         private readonly IEnumerable<string> _expectedLifecycle;
         private readonly int _timeout;
         private readonly string _initialLoaderId;
-        private readonly TaskCompletionSource<bool> _newDocumentNavigationTaskWrapper;
-        private readonly TaskCompletionSource<bool> _sameDocumentNavigationTaskWrapper;
-        private readonly TaskCompletionSource<bool> _lifecycleTaskWrapper;
-        private readonly TaskCompletionSource<bool> _terminationTaskWrapper;
-        [SuppressMessage("Microsoft.Usage", "CA2213:DisposableFieldsShouldBeDisposed", Justification = "False positive, as it is disposed.")]
-        private readonly CancellationTokenSource _terminationCancellationToken;
-        private Request _navigationRequest;
+        private readonly TaskCompletionSource<bool> _newDocumentNavigationTaskWrapper = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource<bool> _sameDocumentNavigationTaskWrapper = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource<bool> _lifecycleTaskWrapper = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource<bool> _terminationTaskWrapper = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly CancellationTokenSource _terminationCancellationToken = new();
+        private IRequest _navigationRequest;
         private bool _hasSameDocumentNavigation;
+        private bool _swapped;
 
         public LifecycleWatcher(
             FrameManager frameManager,
@@ -44,7 +39,7 @@ namespace CefSharp.Dom
         {
             _expectedLifecycle = (waitUntil ?? _defaultWaitUntil).Select(w =>
             {
-                var protocolEvent = _puppeteerToProtocolLifecycle.GetValueOrDefault(w);
+                var protocolEvent = GetProtocolEvent(w);
                 Contract.Assert(protocolEvent != null, $"Unknown value for options.waitUntil: {w}");
                 return protocolEvent;
             });
@@ -55,18 +50,13 @@ namespace CefSharp.Dom
             _timeout = timeout;
             _hasSameDocumentNavigation = false;
 
-            _sameDocumentNavigationTaskWrapper = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-            _newDocumentNavigationTaskWrapper = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-            _lifecycleTaskWrapper = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-            _terminationTaskWrapper = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-            _terminationCancellationToken = new CancellationTokenSource();
-
-            frameManager.LifecycleEvent += FrameManager_LifecycleEvent;
-            frameManager.FrameNavigatedWithinDocument += NavigatedWithinDocument;
-            frameManager.FrameDetached += OnFrameDetached;
-            frameManager.NetworkManager.Request += OnRequest;
-            frameManager.Connection.Disconnected += OnClientDisconnected;
-
+            frame.FrameManager.LifecycleEvent += FrameManager_LifecycleEvent;
+            frame.FrameNavigatedWithinDocument += NavigatedWithinDocument;
+            frame.FrameNavigated += Navigated;
+            frame.FrameSwapped += FrameSwapped;
+            frame.FrameSwappedByActivation += FrameSwapped;
+            frame.FrameDetached += OnFrameDetached;
+            _networkManager.Request += OnRequest;
             CheckLifecycleComplete();
         }
 
@@ -74,25 +64,67 @@ namespace CefSharp.Dom
 
         public Task<bool> NewDocumentNavigationTask => _newDocumentNavigationTaskWrapper.Task;
 
-        public Response NavigationResponse => _navigationRequest?.Response;
+        public Response NavigationResponse => (Response)_navigationRequest?.Response;
 
-        public Task TimeoutOrTerminationTask => _terminationTaskWrapper.Task.WithTimeout(_timeout, cancellationToken: _terminationCancellationToken.Token);
+        public Task TerminationTask => _terminationTaskWrapper.Task.WithTimeout(_timeout, cancellationToken: _terminationCancellationToken.Token);
 
         public Task LifecycleTask => _lifecycleTaskWrapper.Task;
 
-        private void OnClientDisconnected(object sender, EventArgs e)
-            => Terminate(new TargetClosedException("Navigation failed because browser has disconnected!", _frameManager.Connection.CloseReason));
-
-        private void FrameManager_LifecycleEvent(object sender, LifecycleEventArgs e) => CheckLifecycleComplete();
-
-        private void OnFrameDetached(object sender, FrameEventArgs e)
+        public void Dispose()
         {
-            var frame = e.Frame;
+            _frame.FrameManager.LifecycleEvent -= FrameManager_LifecycleEvent;
+            _frame.FrameNavigatedWithinDocument -= NavigatedWithinDocument;
+            _frame.FrameNavigated -= Navigated;
+            _frame.FrameDetached -= OnFrameDetached;
+            _frame.FrameSwapped -= FrameSwapped;
+            _networkManager.Request -= OnRequest;
+            _terminationCancellationToken.Cancel();
+            _terminationCancellationToken.Dispose();
+        }
+
+        private static string GetProtocolEvent(WaitUntilNavigation waitUntil) => waitUntil switch
+        {
+            WaitUntilNavigation.Load => "load",
+            WaitUntilNavigation.DOMContentLoaded => "DOMContentLoaded",
+            WaitUntilNavigation.Networkidle0 => "networkIdle",
+            WaitUntilNavigation.Networkidle2 => "networkAlmostIdle",
+            _ => null,
+        };
+
+        private void Navigated(object sender, FrameNavigatedEventArgs e)
+        {
+            if (e.Type == NavigationType.BackForwardCacheRestore)
+            {
+                FrameSwapped(sender, EventArgs.Empty);
+            }
+
+            CheckLifecycleComplete();
+        }
+
+        private void FrameManager_LifecycleEvent(object sender, FrameEventArgs e) => CheckLifecycleComplete();
+
+        private void FrameSwapped(object sender, EventArgs e)
+        {
+            _swapped = true;
+            CheckLifecycleComplete();
+        }
+
+        private void OnFrameDetached(object sender, EventArgs e)
+        {
+            var frame = sender as Frame;
             if (_frame == frame)
             {
-                Terminate(new PuppeteerException("Navigating frame was detached"));
+                var message = "Navigating frame was detached";
+
+                if (!string.IsNullOrEmpty(frame?.Client?.CloseReason))
+                {
+                    message += $": {frame.Client.CloseReason}";
+                }
+
+                Terminate(new PuppeteerException(message));
                 return;
             }
+
             CheckLifecycleComplete();
         }
 
@@ -103,17 +135,15 @@ namespace CefSharp.Dom
             {
                 return;
             }
+
             _lifecycleTaskWrapper.TrySetResult(true);
-            if (_frame.LoaderId == _initialLoaderId && !_hasSameDocumentNavigation)
-            {
-                return;
-            }
 
             if (_hasSameDocumentNavigation)
             {
                 _sameDocumentNavigationTaskWrapper.TrySetResult(true);
             }
-            if (_frame.LoaderId != _initialLoaderId)
+
+            if (_swapped || _frame.LoaderId != _initialLoaderId)
             {
                 _newDocumentNavigationTaskWrapper.TrySetResult(true);
             }
@@ -127,46 +157,37 @@ namespace CefSharp.Dom
             {
                 return;
             }
+
             _navigationRequest = e.Request;
         }
 
-        private void NavigatedWithinDocument(object sender, FrameEventArgs e)
+        private void NavigatedWithinDocument(object sender, EventArgs e)
         {
-            if (e.Frame != _frame)
-            {
-                return;
-            }
             _hasSameDocumentNavigation = true;
             CheckLifecycleComplete();
         }
 
         private bool CheckLifecycle(Frame frame, IEnumerable<string> expectedLifecycle)
         {
-            foreach (var item in expectedLifecycle)
+            var enumerable = expectedLifecycle as string[] ?? expectedLifecycle.ToArray();
+            foreach (var item in enumerable)
             {
                 if (!frame.LifecycleEvents.Contains(item))
                 {
                     return false;
                 }
             }
-            foreach (var child in frame.ChildFrames)
+
+            foreach (var childFrame in frame.ChildFrames)
             {
-                if (!CheckLifecycle(child, expectedLifecycle))
+                var child = (Frame)childFrame;
+                if (child.HasStartedLoading && !CheckLifecycle(child, enumerable))
                 {
                     return false;
                 }
             }
-            return true;
-        }
 
-        public void Dispose()
-        {
-            _frameManager.LifecycleEvent -= FrameManager_LifecycleEvent;
-            _frameManager.FrameNavigatedWithinDocument -= NavigatedWithinDocument;
-            _frameManager.FrameDetached -= OnFrameDetached;
-            _frameManager.NetworkManager.Request -= OnRequest;
-            _frameManager.Connection.Disconnected -= OnClientDisconnected;
-            _terminationCancellationToken.Cancel();
+            return true;
         }
     }
 }

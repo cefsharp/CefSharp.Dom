@@ -6,8 +6,11 @@ using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
+using CefSharp.DevTools.IO;
+using CefSharp.DevTools.Network;
 using CefSharp.Dom.Messaging;
 using Microsoft.Extensions.Logging;
+using GetRequestPostDataResponse = CefSharp.Dom.Messaging.GetRequestPostDataResponse;
 
 namespace CefSharp.Dom
 {
@@ -33,7 +36,7 @@ namespace CefSharp.Dom
             Frame frame,
             string interceptionId,
             bool allowInterception,
-            RequestWillBeSentPayload e,
+            RequestWillBeSentResponse e,
             List<Request> redirectChain)
         {
             _connection = connection;
@@ -45,9 +48,10 @@ namespace CefSharp.Dom
             InterceptionId = interceptionId;
             IsNavigationRequest = e.RequestId == e.LoaderId && e.Type == ResourceType.Document;
             Url = e.Request.Url;
-            ResourceType = e.Type;
+            ResourceType = e.Type ?? ResourceType.Other;
             Method = e.Request.Method;
             PostData = e.Request.PostData;
+            HasPostData = e.Request.HasPostData ?? false;
             Frame = frame;
             RedirectChainList = redirectChain;
 
@@ -70,7 +74,7 @@ namespace CefSharp.Dom
         /// Gets or sets the failure.
         /// </summary>
         /// <value>The failure.</value>
-        public string Failure { get; internal set; }
+        public string FailureText { get; internal set; }
 
         /// <summary>
         /// Gets or sets the request identifier.
@@ -114,6 +118,13 @@ namespace CefSharp.Dom
         public object PostData { get; internal set; }
 
         /// <summary>
+        /// True when the request has POST data. Note that <see cref="PostData"/> might still be null when this flag is true
+        /// when the data is too long or not readily available in the decoded form.
+        /// In that case, use <see cref="FetchPostDataAsync"/>.
+        /// </summary>
+        public bool HasPostData { get; internal set; }
+
+        /// <summary>
         /// Gets or sets the HTTP headers.
         /// </summary>
         /// <value>HTTP headers.</value>
@@ -152,6 +163,27 @@ namespace CefSharp.Dom
         internal bool FromMemoryCache { get; set; }
 
         internal List<Request> RedirectChainList { get; }
+
+        /// <summary>
+        /// Fetches the POST data for the request from the browser.
+        /// </summary>
+        /// <returns>Task which resolves to the request's POST data.</returns>
+        public async Task<string> FetchPostDataAsync()
+        {
+            try
+            {
+                var result = await _connection.SendAsync<GetRequestPostDataResponse>(
+                    "Network.getRequestPostData",
+                    new GetRequestPostDataRequest(RequestId)).ConfigureAwait(false);
+                return result.PostData;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, ex.ToString());
+            }
+
+            return null;
+        }
 
         /// <summary>
         /// Continues request with optional request overrides. To use this, request interception should be enabled with <see cref="IDevToolsContext.SetRequestInterceptionAsync(bool)"/>. Exception is immediately thrown if the request interception is not enabled.

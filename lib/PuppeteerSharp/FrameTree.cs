@@ -1,57 +1,108 @@
+using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
-using CefSharp.Dom.Messaging;
+using System.Linq;
+using System.Threading.Tasks;
+using CefSharp.Dom.Helpers;
 
 namespace CefSharp.Dom
 {
     internal class FrameTree
     {
-        internal FrameTree() => Childs = new List<FrameTree>();
+        private readonly AsyncDictionaryHelper<string, Frame> _frames = new ("Frame {0} not found");
+        private readonly ConcurrentDictionary<string, string> _parentIds = new ();
+        private readonly ConcurrentDictionary<string, List<string>> _childIds = new ();
+        private readonly ConcurrentDictionary<string, List<TaskCompletionSource<Frame>>> _waitRequests = new();
 
-        internal FrameTree(PageGetFrameTreeItem frameTree)
+        public Frame MainFrame { get; set; }
+
+        public Frame[] Frames => _frames.Values.ToArray();
+
+        internal Task<Frame> GetFrameAsync(string frameId) => _frames.GetItemAsync(frameId);
+
+        internal Task<Frame> TryGetFrameAsync(string frameId) => _frames.TryGetItemAsync(frameId);
+
+        internal Frame GetById(string id)
         {
-            var frame = frameTree.Frame;
-
-            Frame = new FramePayload
-            {
-                Id = frame.Id,
-                ParentId = frame.ParentId,
-                Name = frame.Name,
-                Url = frame.Url
-            };
-
-            Childs = new List<FrameTree>();
-            LoadChilds(this, frameTree);
+            _frames.TryGetValue(id, out var result);
+            return result;
         }
 
-        internal FramePayload Frame { get; set; }
-
-        internal List<FrameTree> Childs { get; set; }
-
-        private void LoadChilds(FrameTree frame, PageGetFrameTreeItem frameTree)
+        internal Task<Frame> WaitForFrameAsync(string frameId)
         {
-            var childFrames = frameTree.ChildFrames;
-
-            if (childFrames != null)
+            var frame = GetById(frameId);
+            if (frame != null)
             {
-                foreach (var item in childFrames)
+                return Task.FromResult(frame);
+            }
+
+            var deferred = new TaskCompletionSource<Frame>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var callbacks = _waitRequests.GetOrAdd(frameId, static _ => new ());
+            callbacks.Add(deferred);
+
+            return deferred.Task;
+        }
+
+        internal void AddFrame(Frame frame)
+        {
+            _frames.AddItem(frame.Id, frame);
+            if (frame.ParentId != null)
+            {
+                _parentIds.TryAdd(frame.Id, frame.ParentId);
+
+                var childIds = _childIds.GetOrAdd(frame.ParentId, static _ => new ());
+                childIds.Add(frame.Id);
+            }
+            else
+            {
+                MainFrame = frame;
+            }
+
+            _waitRequests.TryGetValue(frame.Id, out var requests);
+
+            if (requests != null)
+            {
+                foreach (var request in requests)
                 {
-                    var childFrame = item.Frame;
-
-                    var newFrame = new FrameTree
-                    {
-                        Frame = new FramePayload
-                        {
-                            Id = childFrame.Id,
-                            Name = childFrame.Name,
-                            ParentId = childFrame.ParentId,
-                            Url = childFrame.Url
-                        }
-                    };
-
-                    LoadChilds(newFrame, item);
-                    frame.Childs.Add(newFrame);
+                    request.TrySetResult(frame);
                 }
             }
+        }
+
+        internal void RemoveFrame(Frame frame)
+        {
+            _frames.TryRemove(frame.Id, out _);
+            _parentIds.TryRemove(frame.Id, out var _);
+
+            if (frame.ParentId != null)
+            {
+                _childIds.TryGetValue(frame.ParentId, out var childs);
+                childs?.Remove(frame.Id);
+            }
+            else
+            {
+                MainFrame = null;
+            }
+        }
+
+        internal Frame[] GetChildFrames(string frameId)
+        {
+            _childIds.TryGetValue(frameId, out var childIds);
+            if (childIds == null)
+            {
+                return Array.Empty<Frame>();
+            }
+
+            return childIds
+                .Select(id => GetById(id))
+                .Where(frame => frame != null)
+                .ToArray();
+        }
+
+        internal Frame GetParentFrame(string frameId)
+        {
+            _parentIds.TryGetValue(frameId, out var parentId);
+            return !string.IsNullOrEmpty(parentId) ? GetById(parentId) : null;
         }
     }
 }

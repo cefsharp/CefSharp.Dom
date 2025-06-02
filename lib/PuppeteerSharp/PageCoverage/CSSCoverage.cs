@@ -12,8 +12,8 @@ namespace CefSharp.Dom.PageCoverage
 {
     internal class CSSCoverage
     {
-        private readonly ConcurrentDictionary<string, (string Url, string Source)> _stylesheets = new ();
-        private readonly DeferredTaskQueue _callbackQueue = new ();
+        private readonly ConcurrentDictionary<string, (string Url, string Source)> _stylesheets = new();
+        private readonly DeferredTaskQueue _callbackQueue = new();
         private readonly ILogger _logger;
 
         private DevToolsConnection _connection;

@@ -10,11 +10,11 @@ namespace CefSharp.Dom.PageCoverage
 {
     internal class JSCoverage
     {
-        private readonly Dictionary<string, string> _scriptURLs = new ();
-        private readonly Dictionary<string, string> _scriptSources = new ();
+        private readonly Dictionary<string, string> _scriptURLs = new();
+        private readonly Dictionary<string, string> _scriptSources = new();
         private readonly ILogger _logger;
 
-        private DevToolsConnection _connection;
+        private readonly DevToolsConnection _connection;
         private bool _enabled;
         private bool _resetOnNavigation;
         private bool _reportAnonymousScripts;

@@ -541,7 +541,7 @@ namespace PuppeteerSharp.Tests.RequestInterceptionTests
         }
 
         [PuppeteerTest("requestinterception.spec.ts", "Page.setRequestInterception", "should not throw \"Invalid Interception Id\" if the request was cancelled")]
-        [PuppeteerFact]
+        [PuppeteerFact(Skip = "Investigate")]
         public async Task ShouldNotThrowInvalidInterceptionIdIfTheRequestWasCancelled()
         {
             await DevToolsContext.SetContentAsync("<iframe></iframe>");

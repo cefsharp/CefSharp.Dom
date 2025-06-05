@@ -93,6 +93,12 @@ namespace CefSharp.Dom.PageCoverage
                 var styleSheetId = kv.Key;
                 var url = kv.Value.Url;
                 var text = kv.Value.Source;
+
+                if (url.StartsWith("chrome-error://"))
+                {
+                    continue;
+                }
+
                 styleSheetIdToCoverage.TryGetValue(styleSheetId, out var responseRanges);
                 var ranges = Coverage.ConvertToDisjointRanges(responseRanges ?? new List<CoverageRange>());
                 coverage.Add(new CoverageEntry

@@ -109,6 +109,7 @@ namespace PuppeteerSharp.Tests.KeyboardTests
 
             var keyboard = DevToolsContext.Keyboard;
             var codeForKey = new Dictionary<string, int> { ["Shift"] = 16, ["Alt"] = 18, ["Control"] = 17 };
+
             foreach (var modifier in codeForKey)
             {
                 await keyboard.DownAsync(modifier.Key);
@@ -136,7 +137,7 @@ namespace PuppeteerSharp.Tests.KeyboardTests
         public async Task ShouldReportMultipleModifiers()
         {
             await DevToolsContext.GoToAsync(TestConstants.ServerUrl + "/input/keyboard.html");
-            await ChromiumWebBrowser.WaitForRenderIdleAsync();
+            await ChromiumWebBrowser.WaitForRenderIdleAsync(1000);
 
             var keyboard = DevToolsContext.Keyboard;
             await keyboard.DownAsync("Control");
@@ -158,7 +159,7 @@ namespace PuppeteerSharp.Tests.KeyboardTests
         public async Task ShouldSendProperCodesWhileTyping()
         {
             await DevToolsContext.GoToAsync(TestConstants.ServerUrl + "/input/keyboard.html");
-            await ChromiumWebBrowser.WaitForRenderIdleAsync();
+            await ChromiumWebBrowser.WaitForRenderIdleAsync(1000);
 
             var element = await DevToolsContext.QuerySelectorAsync("textarea");
 
@@ -186,7 +187,7 @@ namespace PuppeteerSharp.Tests.KeyboardTests
         public async Task ShouldSendProperCodesWhileTypingWithShift()
         {
             await DevToolsContext.GoToAsync(TestConstants.ServerUrl + "/input/keyboard.html");
-            await ChromiumWebBrowser.WaitForRenderIdleAsync();
+            await ChromiumWebBrowser.WaitForRenderIdleAsync(1000);
 
             var keyboard = DevToolsContext.Keyboard;
             await keyboard.DownAsync("Shift");

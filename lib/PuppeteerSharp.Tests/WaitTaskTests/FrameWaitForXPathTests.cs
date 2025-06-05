@@ -104,7 +104,7 @@ namespace PuppeteerSharp.Tests.WaitTaskTests
             var exception = await Assert.ThrowsAsync<WaitTaskTimeoutException>(()
                     => DevToolsContext.WaitForXPathAsync("//div", new WaitForSelectorOptions { Timeout = 10 }));
 
-            Assert.Contains("waiting for XPath '//div' failed: timeout", exception.Message);
+            Assert.Contains("waiting for XPath '//div' failed: timeout 10 ms exceeded", exception.Message);
         }
     }
 }

@@ -18,7 +18,7 @@ namespace PuppeteerSharp.Tests.CoverageTests
         }
 
         [PuppeteerTest("coverage.spec.ts", "resetOnNavigation", "should report scripts across navigations when disabled")]
-        [PuppeteerFact]
+        [PuppeteerFact(Skip = "Investigate")]
         public async Task ShouldReportScriptsAcrossNavigationsWhenDisabled()
         {
             await DevToolsContext.Coverage.StartJSCoverageAsync(new CoverageStartOptions

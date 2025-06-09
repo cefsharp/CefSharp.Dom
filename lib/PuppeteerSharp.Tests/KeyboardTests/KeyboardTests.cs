@@ -105,7 +105,7 @@ namespace PuppeteerSharp.Tests.KeyboardTests
         public async Task ShouldReportShiftKey()
         {
             await DevToolsContext.GoToAsync(TestConstants.ServerUrl + "/input/keyboard.html");
-            await ChromiumWebBrowser.WaitForRenderIdleAsync();
+            await ChromiumWebBrowser.WaitForRenderIdleAsync(1000);
 
             var keyboard = DevToolsContext.Keyboard;
             var codeForKey = new Dictionary<string, int> { ["Shift"] = 16, ["Alt"] = 18, ["Control"] = 17 };

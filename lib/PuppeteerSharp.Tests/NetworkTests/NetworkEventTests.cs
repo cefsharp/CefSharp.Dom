@@ -23,7 +23,13 @@ namespace PuppeteerSharp.Tests.NetworkTests
         public async Task PageEventsRequest()
         {
             var requests = new List<Request>();
-            DevToolsContext.Request += (_, e) => requests.Add(e.Request);
+            DevToolsContext.Request += (_, e) =>
+            {
+                if (!e.Request.Url.EndsWith("favicon.ico"))
+                {
+                    requests.Add(e.Request);
+                }
+            };
             await DevToolsContext.GoToAsync(TestConstants.EmptyPage);
             Assert.Single(requests);
             Assert.Equal(TestConstants.EmptyPage, requests[0].Url);
@@ -114,9 +120,30 @@ namespace PuppeteerSharp.Tests.NetworkTests
         public async Task ShouldFireEventsInProperOrder()
         {
             var events = new List<string>();
-            DevToolsContext.Request += (_, _) => events.Add("request");
-            DevToolsContext.Response += (_, _) => events.Add("response");
-            DevToolsContext.RequestFinished += (_, _) => events.Add("requestfinished");
+            DevToolsContext.Request += (_, args) =>
+            {
+                if (!args.Request.Url.EndsWith("favicon.ico"))
+                {
+                    events.Add("request");
+                }
+            };
+
+            DevToolsContext.Response += (_, args) =>
+            {
+                if (!args.Response.Url.EndsWith("favicon.ico"))
+                {
+                    events.Add("response");
+                }
+            };
+
+            DevToolsContext.RequestFinished += (_, args) =>
+            {
+                if (!args.Request.Url.EndsWith("favicon.ico"))
+                {
+                    events.Add("requestfinished");
+                }
+            };
+
             await DevToolsContext.GoToAsync(TestConstants.EmptyPage);
             Assert.Equal(new[] { "request", "response", "requestfinished" }, events.ToArray());
         }
@@ -134,14 +161,18 @@ namespace PuppeteerSharp.Tests.NetworkTests
             const string FOO_URL = TestConstants.ServerUrl + "/foo.html";
             var response = await DevToolsContext.GoToAsync(FOO_URL);
 
-            Assert.Equal(new[] {
+            var expected = new[] {
                 $"GET {FOO_URL}",
                 $"302 {FOO_URL}",
                 $"DONE {FOO_URL}",
                 $"GET {TestConstants.EmptyPage}",
                 $"200 {TestConstants.EmptyPage}",
-                $"DONE {TestConstants.EmptyPage}"
-            }, events.ToArray());
+                $"DONE {TestConstants.EmptyPage}",
+                $"GET {TestConstants.ServerUrl}/favicon.ico",
+                $"200 {TestConstants.ServerUrl}/favicon.ico" ,
+                $"DONE {TestConstants.ServerUrl}/favicon.ico" };
+
+            Assert.Equal(events.ToArray(), expected);
 
             // Check redirect chain
             var redirectChain = response.Request.RedirectChain;

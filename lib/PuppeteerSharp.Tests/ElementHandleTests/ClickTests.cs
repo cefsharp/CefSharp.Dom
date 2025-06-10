@@ -66,7 +66,7 @@ namespace PuppeteerSharp.Tests.ElementHandleTests
                 .AndThen(x => x.SetPropertyAsync("display", "none"));
             //await DevToolsContext.EvaluateFunctionAsync("button => button.style.display = 'none'", (JSHandle)button);
             var exception = await Assert.ThrowsAsync<PuppeteerException>(async () => await button.ClickAsync());
-            Assert.Equal("Node is either not visible or not an HTMLElement", exception.Message);
+            Assert.Equal("Node is either not clickable or not an Element", exception.Message);
         }
 
         [PuppeteerTest("elementhandle.spec.ts", "ElementHandle.click", "should throw for recursively hidden nodes")]

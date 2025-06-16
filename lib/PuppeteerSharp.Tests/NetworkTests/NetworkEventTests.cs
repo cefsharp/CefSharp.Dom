@@ -14,8 +14,11 @@ namespace PuppeteerSharp.Tests.NetworkTests
     [Collection(TestConstants.TestFixtureCollectionName)]
     public class NetworkEventTests : DevToolsContextBaseTest
     {
+        private readonly ITestOutputHelper _output;
+
         public NetworkEventTests(ITestOutputHelper output) : base(output)
         {
+            _output = output;
         }
 
         [PuppeteerTest("network.spec.ts", "Network Events", "Page.Events.Request")]
@@ -171,6 +174,8 @@ namespace PuppeteerSharp.Tests.NetworkTests
                 $"GET {TestConstants.ServerUrl}/favicon.ico",
                 $"200 {TestConstants.ServerUrl}/favicon.ico" ,
                 $"DONE {TestConstants.ServerUrl}/favicon.ico" };
+
+            _output.WriteLine("Events: " + string.Join(", ", events));
 
             Assert.Equal(events.ToArray(), expected);
 

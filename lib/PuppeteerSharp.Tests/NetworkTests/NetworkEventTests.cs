@@ -108,7 +108,13 @@ namespace PuppeteerSharp.Tests.NetworkTests
         public async Task PageEventsRequestFinished()
         {
             var requests = new List<Request>();
-            DevToolsContext.RequestFinished += (_, e) => requests.Add(e.Request);
+            DevToolsContext.RequestFinished += (_, e) =>
+            {
+                if(!TestUtils.IsFavicon(e.Request))
+                {
+                    requests.Add(e.Request);
+                }                
+            };
             await DevToolsContext.GoToAsync(TestConstants.EmptyPage);
             Assert.Single(requests);
             Assert.Equal(TestConstants.EmptyPage, requests[0].Url);
@@ -170,14 +176,13 @@ namespace PuppeteerSharp.Tests.NetworkTests
                 $"DONE {FOO_URL}",
                 $"GET {TestConstants.EmptyPage}",
                 $"200 {TestConstants.EmptyPage}",
-                $"DONE {TestConstants.EmptyPage}",
-                $"GET {TestConstants.ServerUrl}/favicon.ico",
-                $"200 {TestConstants.ServerUrl}/favicon.ico" ,
-                $"DONE {TestConstants.ServerUrl}/favicon.ico" };
+                $"DONE {TestConstants.EmptyPage}" };
 
             _output.WriteLine("Events: " + string.Join(", ", events));
 
-            Assert.Equal(events.ToArray(), expected);
+            var actual = events.Where(item => !TestUtils.IsFavicon(item)).ToArray();
+
+            Assert.Equal(actual, expected);
 
             // Check redirect chain
             var redirectChain = response.Request.RedirectChain;

@@ -28,7 +28,7 @@ namespace PuppeteerSharp.Tests.NetworkTests
             var requests = new List<Request>();
             DevToolsContext.Request += (_, e) =>
             {
-                if (!e.Request.Url.EndsWith("favicon.ico"))
+                if (!TestUtils.IsFavicon(e.Request))
                 {
                     requests.Add(e.Request);
                 }
@@ -60,7 +60,13 @@ namespace PuppeteerSharp.Tests.NetworkTests
         public async Task PageEventsResponse()
         {
             var responses = new List<Response>();
-            DevToolsContext.Response += (_, e) => responses.Add(e.Response);
+            DevToolsContext.Response += (_, e) =>
+            {
+                if (!TestUtils.IsFavicon(e.Response.Request))
+                {
+                    responses.Add(e.Response);
+                }
+            };
             await DevToolsContext.GoToAsync(TestConstants.EmptyPage);
             Assert.Single(responses);
             Assert.Equal(TestConstants.EmptyPage, responses[0].Url);

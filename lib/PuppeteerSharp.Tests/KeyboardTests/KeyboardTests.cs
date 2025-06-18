@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using CefSharp.Dom;
 using CefSharp.Dom.Input;
+using CefSharp.Dom.Tests;
 using PuppeteerSharp.Tests.Attributes;
 using PuppeteerSharp.Xunit;
 using Xunit;
@@ -155,7 +156,7 @@ namespace PuppeteerSharp.Tests.KeyboardTests
         }
 
         [PuppeteerTest("keyboard.spec.ts", "Keyboard", "should send proper codes while typing")]
-        [PuppeteerFact]
+        [SkipIfRunOnAppVeyorFact]
         public async Task ShouldSendProperCodesWhileTyping()
         {
             await DevToolsContext.GoToAsync(TestConstants.ServerUrl + "/input/keyboard.html");

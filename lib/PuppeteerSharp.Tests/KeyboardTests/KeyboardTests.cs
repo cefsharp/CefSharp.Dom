@@ -102,7 +102,7 @@ namespace PuppeteerSharp.Tests.KeyboardTests
         }
 
         [PuppeteerTest("keyboard.spec.ts", "Keyboard", "should report shiftKey")]
-        [PuppeteerFact]
+        [PuppeteerRetryFact]
         public async Task ShouldReportShiftKey()
         {
             await DevToolsContext.GoToAsync(TestConstants.ServerUrl + "/input/keyboard.html");

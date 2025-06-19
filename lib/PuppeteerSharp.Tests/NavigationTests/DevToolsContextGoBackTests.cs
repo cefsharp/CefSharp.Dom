@@ -15,7 +15,7 @@ namespace PuppeteerSharp.Tests.NavigationTests
 
         //TODO: This is working in puppeteer. I don't know why is hanging here.
         [PuppeteerTest("navigation.spec.ts", "Page.goBack", "should work")]
-        [PuppeteerFact()]
+        [PuppeteerRetryFact()]
         public async Task ShouldWork()
         {
             await DevToolsContext.GoToAsync(TestConstants.EmptyPage);

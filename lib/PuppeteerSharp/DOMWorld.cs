@@ -364,6 +364,7 @@ namespace CefSharp.Dom
                  options.Polling,
                  options.PollingInterval,
                  options.Timeout ?? _timeoutSettings.Timeout,
+                 options.TimeoutReturnsNull,
                  args);
 
             return await waitTask
@@ -380,7 +381,8 @@ namespace CefSharp.Dom
                 "function",
                 options.Polling,
                 options.PollingInterval,
-                options.Timeout ?? _timeoutSettings.Timeout);
+                options.Timeout ?? _timeoutSettings.Timeout,
+                options.TimeoutReturnsNull);
 
             return await waitTask
                 .Task
@@ -437,6 +439,7 @@ namespace CefSharp.Dom
                 polling,
                 null,
                 timeout,
+                options.TimeoutReturnsNull,
                 new object[] { selectorOrXPath, isXPath, options.Visible, options.Hidden });
 
             var handle = await waitTask.Task.ConfigureAwait(false);

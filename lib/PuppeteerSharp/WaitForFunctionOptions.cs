@@ -15,6 +15,12 @@ namespace CefSharp.Dom
         public int? Timeout { get; set; }
 
         /// <summary>
+        /// If set to <see langword="true" />, the method will return <see langword="null"/> if the timeout is reached.
+        /// The default (<see langword="false" />) will throw a <see cref="WaitTaskTimeoutException"/> if the timeout is reached."/>
+        /// </summary>
+        public bool TimeoutReturnsNull { get; set; } = false;
+
+        /// <summary>
         /// An interval at which the <c>pageFunction</c> is executed. defaults to <see cref="WaitForFunctionPollingOption.Raf"/>
         /// </summary>
         public WaitForFunctionPollingOption Polling { get; set; } = WaitForFunctionPollingOption.Raf;

@@ -14,6 +14,7 @@ namespace CefSharp.Dom
         private readonly int _timeout;
         private readonly object[] _args;
         private readonly string _title;
+        private readonly bool _timeoutReturnsNull;
         private readonly Task _timeoutTimer;
 
         private readonly CancellationTokenSource _cts;
@@ -107,6 +108,7 @@ async function waitForPredicatePageFunction(predicateBody, polling, timeout, ...
             WaitForFunctionPollingOption polling,
             int? pollingInterval,
             int timeout,
+            bool timeoutReturnsNull,
             object[] args = null)
         {
             if (string.IsNullOrEmpty(predicateBody))
@@ -125,6 +127,7 @@ async function waitForPredicatePageFunction(predicateBody, polling, timeout, ...
             _timeout = timeout;
             _args = args ?? Array.Empty<object>();
             _title = title;
+            _timeoutReturnsNull = timeoutReturnsNull;
 
             _cts = new CancellationTokenSource();
 
@@ -136,7 +139,7 @@ async function waitForPredicatePageFunction(predicateBody, polling, timeout, ...
             {
                 _timeoutTimer = System.Threading.Tasks.Task.Delay(timeout, _cts.Token)
                     .ContinueWith(
-                        _ => Terminate(new WaitTaskTimeoutException(timeout, title)),
+                        _ => Terminate(_timeoutReturnsNull ? null : new WaitTaskTimeoutException(timeout, title)),
                         TaskScheduler.Default);
             }
 
@@ -212,7 +215,16 @@ async function waitForPredicatePageFunction(predicateBody, polling, timeout, ...
         internal void Terminate(Exception exception)
         {
             _terminated = true;
-            _taskCompletion.TrySetException(exception);
+
+            if (exception == null)
+            {
+                _taskCompletion.TrySetResult(null);
+            }
+            else
+            {
+                _taskCompletion.TrySetException(exception);
+            }
+
             Cleanup();
         }
 

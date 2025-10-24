@@ -208,6 +208,15 @@ namespace PuppeteerSharp.Tests.WaitTaskTests
             Assert.Equal("waiting for function failed: timeout 10 ms exceeded", exception.Message);
         }
 
+        [PuppeteerTest("waittask.spec.ts", "Frame.waitForSelector", "should respect timeout")]
+        [PuppeteerFact]
+        public async Task ShouldRespectTimeoutReturnNull()
+        {
+            var result = await DevToolsContext.WaitForExpressionAsync("false", new WaitForFunctionOptions { Timeout = 10, TimeoutReturnsNull = true });
+
+            Assert.Null(result);
+        }
+
         [PuppeteerTest("waittask.spec.ts", "Frame.waitForSelector", "should have an error message specifically for awaiting an element to be hidden")]
         [PuppeteerFact]
         public async Task ShouldHaveAnErrorMessageSpecificallyForAwaitingAnElementToBeHidden()
